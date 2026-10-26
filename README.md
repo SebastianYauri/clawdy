@@ -1,0 +1,145 @@
+<p align="center">
+  <img src="docs/media/banner.png" alt="Clawdy: your Claude usage, with an animated buddy" width="100%">
+</p>
+
+<p align="center">
+  <a href="https://github.com/SebastianYauri/clawdy/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/SebastianYauri/clawdy?color=d97757&label=download"></a>
+  <a href="https://github.com/SebastianYauri/clawdy/actions/workflows/build.yml"><img alt="Build" src="https://github.com/SebastianYauri/clawdy/actions/workflows/build.yml/badge.svg"></a>
+  <img alt="Windows | macOS | Linux" src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-2a2421">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2a2421"></a>
+</p>
+
+**Clawdy** is a tiny desktop buddy that sits in a corner of your screen and
+shows **how much of your Claude plan you've used**. While Claude Code works,
+Clawdy acts it out: it thinks, types on its laptop, hammers away at commands,
+juggles subagents… and throws confetti when the job is done.
+
+<p align="center">
+  <img src="docs/media/hover.gif" alt="Hovering Clawdy slides out a panel with every usage limit" width="560">
+</p>
+
+## Features
+
+- **Usage at a glance.** Three rings around Clawdy show your 5-hour session,
+  your weekly limit and, if your plan has one, a per-model weekly limit.
+  Green, yellow from 70 %, red from 90 %.
+- **Details on hover.** Move the mouse over it and a panel slides out with every
+  limit and when it resets, including paid extra usage if you turned it on.
+- **Reacts to Claude Code.** Through Claude Code hooks, Clawdy knows when Claude
+  is thinking, writing code, running commands, reading files, using subagents,
+  compacting context, waiting for you or hitting an error.
+- **Costumes.** Witch, pumpkin, ghost, vampire and Santa, each with its own
+  tricks and themed props. On *Auto* it dresses up by itself for Halloween and
+  Christmas.
+- **One click to a new chat.** The **+** button opens a new chat in the Claude
+  desktop app, or on claude.ai if the app isn't installed.
+- **Updates itself.** Checks GitHub Releases at start-up and every 6 hours.
+- **Free and private.** No API key, no extra cost, no servers, no telemetry.
+- **English and Spanish**, following your system language.
+
+<p align="center">
+  <img src="docs/media/states.gif" alt="Clawdy acting out what Claude Code is doing" width="760">
+</p>
+
+## Download
+
+Get the file for your computer from the
+**[latest release](https://github.com/SebastianYauri/clawdy/releases/latest)**:
+
+| Your computer | File | How to install |
+|---|---|---|
+| **Windows 10 / 11** | `Clawdy-Setup.exe` | Double-click it and follow the steps. No admin rights needed. |
+| **Ubuntu, Debian, Mint** | `clawdy_…_all.deb` | Double-click it → **Install**, or `sudo apt install ./clawdy_*_all.deb`. |
+| **Mac (Apple silicon)** | `Clawdy-mac.dmg` | Open it and drag *Clawdy* into *Applications*. |
+
+You need [Claude Code](https://claude.com/claude-code) installed and signed in.
+The first time Clawdy opens it explains what it does and asks before connecting
+to Claude Code or starting at login.
+
+> [!NOTE]
+> **Windows says "Windows protected your PC"?** That's normal for new apps
+> without a paid code-signing certificate. Click **More info** → **Run anyway**.
+> It only happens once.
+>
+> **macOS says it can't verify the developer?** Open **System Settings →
+> Privacy & Security** and click **Open Anyway**. Then, when macOS asks whether
+> *Clawdy* may use *Claude Code-credentials*, click **Always Allow**: that's
+> your Claude Code session, which Clawdy needs to read your usage.
+
+**Other systems** (Intel Macs, Fedora, Arch…): with Python 3.8+ and tkinter,
+clone the repo and run `python3 install.py`. See [Building](docs/building.md).
+
+## Using it
+
+| Do this | To |
+|---|---|
+| Hover | Slide out the panel with every limit and its reset time |
+| Click **+** | Start a new Claude chat |
+| Drag | Move Clawdy anywhere |
+| Right-click | Open the menu |
+
+<p align="center">
+  <img src="docs/media/menu.png" alt="The right-click menu" width="300">
+</p>
+
+From the menu you can refresh usage, check for updates, change the size
+(small, normal, large), pick a costume, keep the panel always open, and turn
+*React to Claude Code* and *Open at login* on or off.
+
+### Costumes
+
+<p align="center">
+  <img src="docs/media/costumes.gif" alt="Classic, witch, pumpkin, ghost, vampire and Santa" width="620">
+</p>
+
+The witch flies on her broom, reads a crystal ball while Claude thinks,
+writes in a spellbook and stirs a cauldron when commands run. The ghost floats
+and says boo, the pumpkin rolls and glows, the vampire turns into a bat and
+Santa pulls out presents.
+
+## Does it cost anything?
+
+No. Clawdy reads the same numbers you see with `/usage` in Claude Code, using
+the session Claude Code already has on your computer. Checking costs nothing
+from your plan and uses no API key. It asks at most once every 5 minutes.
+
+Everything stays on your computer. The only other request Clawdy makes is to
+this GitHub repository, to see whether there is a new version. Details in
+[How it works](docs/how-it-works.md).
+
+## Updates
+
+- **Windows and macOS** update silently and reopen.
+- **Ubuntu/Debian** shows *"click to update"*; the system then asks for your
+  password, like any package install.
+- Right-click → **Check for updates** to look right away.
+
+## Uninstall
+
+- **Windows**: Settings → Apps → *Clawdy* → Uninstall. This also disconnects it
+  from Claude Code.
+- **Ubuntu/Debian**: first right-click Clawdy and turn off *React to Claude
+  Code*, then `sudo apt remove clawdy`. (If you skip the first step nothing
+  breaks: the hook simply does nothing once Clawdy is gone.)
+- **macOS**: right-click Clawdy, turn off *React to Claude Code* and *Open at
+  login*, quit, and move the app to the Trash.
+- **From source**: `python3 install.py --uninstall`.
+
+## Documentation
+
+- [How it works](docs/how-it-works.md): usage data, hooks, files it touches, updates
+- [Building](docs/building.md): run from source, build the installers
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+
+## Credits
+
+Clawdy is a fan project inspired by Clawd, the Claude Code mascot, and by
+[Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter) and
+[Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk). All artwork
+and animation is drawn in code; no files from those projects are used.
+
+Not affiliated with or endorsed by Anthropic. Claude and Claude Code are
+trademarks of Anthropic.
+
+Released under the [MIT License](LICENSE).
