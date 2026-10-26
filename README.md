@@ -31,7 +31,11 @@ juggles subagents… and throws confetti when the job is done.
 
 - **Reacts to Claude Code.** Through Claude Code hooks, Clawdy knows when Claude
   is thinking, writing code, running commands, reading files, using subagents,
-  compacting context, waiting for you or hitting an error.
+  compacting context, waiting for you or hitting an error. Each state rotates
+  through a few animations so long sessions stay fun: a light bulb going *aha!*,
+  coffee breaks, turbo typing with a keyboard on fire, a scrolling terminal, a
+  magnifying glass, victory dances and fireworks. Leave it alone long enough and
+  it takes a nap.
 - **Costumes.** Witch, pumpkin, ghost, vampire and Santa, each with its own
   tricks and themed props. On *Auto* it dresses up by itself for Halloween and
   Christmas.
@@ -43,6 +47,10 @@ juggles subagents… and throws confetti when the job is done.
 
 <p align="center">
   <img src="docs/media/states.gif" alt="Clawdy acting out what Claude Code is doing" width="760">
+</p>
+
+<p align="center">
+  <img src="docs/media/moods.gif" alt="Thinking, aha!, pacing, typing, coffee break, turbo mode, hammering, terminal, reading, inspecting, victory dance and fireworks" width="760">
 </p>
 
 ## Download

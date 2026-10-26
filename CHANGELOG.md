@@ -3,6 +3,15 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.1.0
+
+- More animations while you code: each Claude Code state now rotates through
+  several of them. Thinking lights an *aha!* bulb or paces around, writing takes
+  coffee breaks or goes turbo with the keyboard on fire, commands show a
+  scrolling terminal, reading uses a magnifying glass, and finishing a task
+  brings a victory dance or fireworks.
+- Clawdy takes a nap after 15 minutes without Claude Code activity.
+
 ## 1.0.0
 
 First public release.

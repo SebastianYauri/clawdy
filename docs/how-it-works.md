@@ -43,15 +43,18 @@ open sessions:
 
 | Claude Code is… | Clawdy… |
 |---|---|
-| thinking about your prompt | shows a thought bubble |
-| editing or writing files | types on a laptop |
-| running shell commands | hammers |
-| reading, searching, fetching | reads a book |
+| thinking about your prompt | shows a thought bubble, lights up an *aha!* bulb or paces around |
+| editing or writing files | types on a laptop, takes coffee breaks or goes turbo with the keyboard on fire |
+| running shell commands | hammers or watches a terminal scroll by |
+| reading, searching, fetching | reads a book or inspects it with a magnifying glass |
 | running one subagent / several | grooves with headphones / juggles |
 | waiting for you (permission, notification) | raises an alert |
 | hitting an error | gets X eyes and a puff of smoke |
 | compacting context | sweeps |
-| done | throws confetti |
+| done | throws confetti, dances or sets off fireworks |
+
+States with several animations rotate every few seconds while Claude Code stays
+in that state. After 15 minutes without any Claude Code activity, Clawdy naps.
 
 Hooks that belong to other tools are never touched: Clawdy only adds or removes
 entries that point at its own program, and keeps a backup of the previous file

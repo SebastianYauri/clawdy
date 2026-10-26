@@ -38,7 +38,13 @@ HAT_TOP = {"witch": -56, "santa": -52, "pumpkin": -38}   # sprite units; the bod
 HOP = 0.42                          # lower jumps: Clawdy lives inside the rings
 REACH = 0.55                        # floating props are pulled closer…
 PART_REACH = 0.6                    # …and particles too, so they fit in the porthole
-FAR_PROPS = ("bubble", "balls", "bang", "err", "hammer", "broom", "crystal", "cauldron")
+FAR_PROPS = ("bubble", "balls", "bang", "err", "hammer", "broom", "crystal", "cauldron", "bulb")
+# Each Claude Code state rotates through a few animations so long sessions stay fun.
+VARIANTS = {"thinking": ("bubble", "bulb", "pace"), "typing": ("laptop", "coffee", "turbo"),
+            "building": ("hammer", "terminal"), "reading": ("book", "magnifier"),
+            "happy": ("confetti", "dance", "fireworks")}
+VARIANT_SECS = 7.0
+NAP_AFTER = 15 * 60                # no Claude Code activity for this long: take a nap
 PLUS = (93, 11)                     # new chat button, in the free corner
 PLUS_R = 9
 INFO_Y = H - 7                      # bottom line: names, or what's going on
@@ -443,6 +449,8 @@ class Widget:
         self.t0 = time.time()
         self._last = self.t0
         self._act_read = 0.0
+        self._work_prev, self._work_t, self._work_seed = None, 0.0, 0
+        self._last_work = time.time()
         self.work = None
         self.pos, self.dir, self.act_i, self.act_t = 0.0, 1, 0, 0.0
         self.parts, self.landed, self.emit, self.hammer = [], False, 0.0, 0.0
@@ -945,6 +953,14 @@ class Widget:
             self._act_read = now
             self.work = read_activity(now)
         work = self.work
+        if work != self._work_prev:
+            self._work_prev, self._work_t = work, 0.0
+            self._work_seed += 1
+        self._work_t += dt
+        if work:
+            self._last_work = now
+        vs = VARIANTS.get(work)
+        variant = vs[(self._work_seed + int(self._work_t / VARIANT_SECS)) % len(vs)] if vs else None
 
         energy = 1 + top / 100 * 1.5          # more usage = faster
         panic = top >= 90
@@ -963,6 +979,8 @@ class Widget:
         if panic and act == "walk" and costume != "ghost":
             act = "run"
         if top < 10 and act == "look":
+            act = "sleep"
+        if not self.demo and now - self._last_work > NAP_AFTER and act not in ("wave", "special"):
             act = "sleep"
         p = self.act_t / DUR
         if work:
@@ -1157,11 +1175,59 @@ class Widget:
                 self.emit = 0.3
 
         # --- states coming from Claude Code ---
+        elif act == "thinking" and variant == "pace":   # paces around, hand on chin
+            self.pos += self.dir * 22 * dt
+            if abs(self.pos) > lim * 0.8:
+                self.pos = math.copysign(lim * 0.8, self.pos)
+                self.dir *= -1
+            step = int(t * 6 / math.pi) % 2
+            arm_r = -5
+            eye_dx, eye_dy = self.dir * 2, -1.5
+            if self.emit <= 0:
+                self.spawn("dots", cx + self.pos + self.dir * 14, by - SH - 4, 0, -14, 1.2)
+                self.emit = 1.1
+        elif act == "thinking" and variant == "bulb":   # a light bulb flickers on: aha!
+            q = (self._work_t % VARIANT_SECS) / VARIANT_SECS
+            self.bulb = 0.0 if q < 0.25 else (1.0 if q > 0.45 else float(int(t * 14) % 2))
+            eye_dx, eye_dy = 0.0, -2.5
+            eye = "happy" if self.bulb >= 1 else "open"
+            arm_r = -9 if self.bulb >= 1 else -3
+            dy = -abs(math.sin(t * 6)) * 3 if self.bulb >= 1 else 0
+            props.append("bulb")
+            if self.bulb >= 1 and self.emit <= 0:
+                self.spawn("spark", cx + self.pos + random.uniform(-14, 14), by - SH - 34,
+                           random.uniform(-40, 40), random.uniform(-50, -10), 0.6)
+                self.emit = 0.2
         elif act == "thinking":
             eye_dx, eye_dy = 1.5, -2
             dy = -abs(math.sin(t * 2)) * 2
             arm_r = -4 + math.sin(t * 3)
             props.append("bubble")
+        elif act == "typing" and variant == "coffee":    # types, then sips coffee
+            q = t % 3.0
+            sip = q > 2.0
+            eye_dy = 2 if not sip else -1
+            eye = "happy" if sip else "open"
+            arm_l = -9 if sip else (2 if int(t * 12) % 2 else -2)
+            arm_r = 2 if int(t * 12 + 1) % 2 else -2
+            self.sip = sip
+            props += ["laptop", "mug"]
+            if not sip and self.emit <= 0:
+                self.spawn("txt", cx + self.pos + random.uniform(-20, 20), by - 30,
+                           random.uniform(-10, 10), -35, 1.1, txt=random.choice(CODE))
+                self.emit = 0.3
+        elif act == "typing" and variant == "turbo":     # furious typing: the keyboard is on fire
+            eye_dy, eye = 2, "scared"
+            arm_l = 3 if int(t * 26) % 2 else -3
+            arm_r = -arm_l
+            self.pos += math.sin(t * 40) * 0.5
+            props += ["laptop", "flames"]
+            if self.emit <= 0:
+                self.spawn("txt", cx + self.pos + random.uniform(-24, 24), by - 30,
+                           random.uniform(-30, 30), random.uniform(-60, -35), 0.9, txt=random.choice(CODE))
+                if random.random() < 0.3:
+                    self.spawn("drop", cx + self.pos + SW / 2 - 6, by - SH + 6, 14, -14, 0.8)
+                self.emit = 0.09
         elif act == "typing":
             eye_dy = 2
             arm_l = 2 if int(t * 14) % 2 else -2
@@ -1175,6 +1241,12 @@ class Widget:
                     self.spawn("txt", cx + self.pos + random.uniform(-20, 20), by - 30,
                                random.uniform(-10, 10), -35, 1.1, txt=random.choice(CODE))
                 self.emit = 0.22
+        elif act == "building" and variant == "terminal":   # watches a terminal scroll by
+            eye_dx = 2.5
+            eye_dy = -1 + ((t * 2) % 1) * 2
+            arm_r = -3
+            dy = -abs(math.sin(t * 2)) * 1.5
+            props.append("terminal")
         elif act == "building":
             ph = (t * 1.8) % 1
             self.hammer = 2.0 - ph / 0.6 * 2.3 if ph < 0.6 else -0.3 + min(1, (ph - 0.6) / 0.1) * 2.3
@@ -1193,6 +1265,13 @@ class Widget:
             elif ph < 0.6:
                 self.landed = False
             props.append("hammer")
+        elif act == "reading" and variant == "magnifier":   # inspects every line with a magnifier
+            sweep = math.sin(t * 1.6)
+            eye_dx, eye_dy = sweep * 2.5, 1
+            arm_r = -4 + sweep * 2
+            dy = -abs(math.sin(t * 3)) * 1
+            self.lens = sweep
+            props.append("magnifier")
         elif act == "reading":
             eye_dy = 2
             eye_dx = -2 + ((t * 0.7) % 1) * 4
@@ -1235,6 +1314,30 @@ class Widget:
             if self.emit <= 0:
                 self.spawn("dust", cx + self.pos + self.dir * (SW / 2 + 14), by, self.dir * 30, -10, 0.6)
                 self.emit = 0.12
+        elif act == "happy" and variant == "dance":     # victory dance
+            rot = math.sin(t * 8) * 0.2
+            dy = -abs(math.sin(t * 8)) * 7
+            arm_l = -7 if math.sin(t * 8) > 0 else 1
+            arm_r = 1 if math.sin(t * 8) > 0 else -7
+            step = int(t * 8 / math.pi) % 2
+            eye = "happy"
+            if self.emit <= 0:
+                side = random.choice((-1, 1))
+                self.spawn("note", cx + self.pos + side * (SW / 2 + 6), by - SH, side * 18, -35, 1.4)
+                self.spawn("conf", cx + self.pos + random.uniform(-40, 40), by - SH - 10,
+                           random.uniform(-30, 30), random.uniform(-80, -30), 1.4,
+                           col=random.choice(PALETTES.get(costume, CONFETTI)), spin=random.uniform(0, 6))
+                self.emit = 0.3
+        elif act == "happy" and variant == "fireworks":  # fireworks behind Clawdy
+            eye, arm_l, arm_r = "happy", -8, -8
+            dy = -abs(math.sin(t * 3)) * 3
+            if self.emit <= 0:
+                ox, oy = cx + random.uniform(-45, 45), by - SH - random.uniform(10, 30)
+                col = random.choice(PALETTES.get(costume, CONFETTI))
+                for i in range(14):
+                    a = i * math.pi / 7
+                    self.spawn("fw", ox, oy, math.cos(a) * 85, math.sin(a) * 85, 1.1, col=col)
+                self.emit = 0.45
         elif act == "happy":
             q = (t * 2.2) % 1
             dy = -math.sin(q * math.pi) * 22 * HOP
@@ -1541,6 +1644,62 @@ class Widget:
                 yb = bt - 26 - abs(math.sin(t * 7)) * 4
                 self.oval(bx, yb, 13, 13, hx(col))
                 self.text(bx, yb, "!", dark, 14, bold=True, anchor="center")
+            elif pr == "bulb":
+                on = getattr(self, "bulb", 0.0)
+                ox, oy = (bx + SW / 2 + 20, bt - 18) if costume in HAT_TOP else (bx, bt - 34)   # beside a hat
+                if on:
+                    self.oval(ox, oy, 30, 30, hx((1.0, 0.92, 0.45), 0.22))
+                    for i in range(8):
+                        a = i * math.pi / 4 + t
+                        self.canvas.create_line(ox + math.cos(a) * 22, oy + math.sin(a) * 22,
+                                                ox + math.cos(a) * 30, oy + math.sin(a) * 30,
+                                                fill=hx((1.0, 0.92, 0.45)), width=self.lw(3))
+                self.oval(ox, oy, 17, 17, hx((1.0, 0.92, 0.45) if on else (0.55, 0.55, 0.50)))
+                self.oval(ox - 5, oy - 6, 4, 4, hx((1, 1, 1), 0.8 if on else 0.3))
+                self.rect(ox - 8, oy + 14, 16, 10, hx((0.60, 0.62, 0.66)))
+                self.rect(ox - 6, oy + 24, 12, 4, hx((0.40, 0.42, 0.46)))
+            elif pr == "mug":
+                sip = getattr(self, "sip", False)
+                mx, my = (bx - SW / 2 + 2, bt + 18) if sip else (bx - SW / 2 - 10, by - 14)
+                self.rect(mx - 6, my, 12, 12, hx((0.95, 0.95, 0.92)))
+                self.rect(mx - 4, my + 2, 8, 3, hx((0.45, 0.28, 0.18)))
+                self.canvas.create_arc(mx + 3, my + 2, mx + 11, my + 9, start=-90, extent=180,
+                                       style="arc", outline=hx((0.95, 0.95, 0.92)), width=self.lw(2))
+                for i in range(2):
+                    wob = math.sin(t * 4 + i * 2) * 2
+                    self.oval(mx - 2 + i * 4 + wob, my - 5 - ((t * 10 + i * 5) % 8), 1.5, 2,
+                              hx((0.85, 0.85, 0.85), 0.6))
+            elif pr == "flames":
+                for i in range(5):
+                    fx = bx - 22 + i * 11
+                    h = 7 + abs(math.sin(t * 13 + i * 1.7)) * 9
+                    self.poly([(fx - 5, by - 8), (fx + 5, by - 8), (fx, by - 8 - h)], hx((0.98, 0.55, 0.15)))
+                    self.poly([(fx - 2.5, by - 8), (fx + 2.5, by - 8), (fx, by - 8 - h * 0.55)],
+                              hx((1.0, 0.88, 0.35)))
+            elif pr == "terminal":
+                ox, oy = bx + 26, by - 24                  # in front of Clawdy, inside the porthole
+                self.rect(ox - 24, oy - 18, 48, 34, hx((0.30, 0.32, 0.36)))
+                self.rect(ox - 21, oy - 15, 42, 25, hx((0.06, 0.07, 0.08)))
+                scroll = int(t * 6)
+                for i in range(4):
+                    w = 10 + ((scroll + i) * 7) % 24
+                    self.rect(ox - 18, oy - 12 + i * 5, w, 3, hx((0.45, 0.85, 0.45)))
+                prog = (t * 0.35) % 1
+                self.rect(ox - 21, oy + 12, 42, 4, hx((0.20, 0.21, 0.24)))
+                self.rect(ox - 21, oy + 12, 42 * prog, 4, hx((0.45, 0.85, 0.45)))
+                self.rect(ox - 5, oy + 16, 10, 8, hx((0.30, 0.32, 0.36)))
+            elif pr == "magnifier":
+                lx = bx + getattr(self, "lens", 0.0) * 16
+                ly = by - 20
+                for side in (-1, 1):                     # an open book underneath
+                    x = bx if side > 0 else bx - 20
+                    self.rect(x - 1, by - 21, 22, 13, hx((0.55, 0.30, 0.20)))
+                    self.rect(x + 1, by - 19, 18, 9, hx((0.97, 0.95, 0.88)))
+                self.canvas.create_line(lx + 7, ly + 7, lx + 16, ly + 16,
+                                        fill=hx((0.55, 0.36, 0.20)), width=self.lw(4))
+                self.oval(lx, ly, 10, 10, hx((0.75, 0.76, 0.80)))
+                self.oval(lx, ly, 8, 8, hx((0.70, 0.88, 1.0)))
+                self.oval(lx - 3, ly - 3, 2.5, 2, hx((1, 1, 1)))
             elif pr == "broom":
                 d = self.dir
                 sweep = math.sin(t * 9) * 6
@@ -1559,7 +1718,7 @@ class Widget:
             alive.append(q)
             q["x"] += q["vx"] * dt
             q["y"] += q["vy"] * dt
-            if q["k"] in ("spark", "drop", "conf"):
+            if q["k"] in ("spark", "drop", "conf", "fw"):
                 q["vy"] += 120 * dt
             a = q["life"] / q["max"]
             x, y, k = q["x"], q["y"], q["k"]
@@ -1590,6 +1749,9 @@ class Widget:
                 self.rect(x + 0.5, y - 1.5, 1.5, 1.5, eye)
             elif k == "bubble":
                 self.oval(x, y, 3, 3, hx((0.45, 0.90, 0.40), a))
+            elif k == "fw":
+                self.rect(x - 2.5, y - 2.5, 5, 5, hx(q["col"], a))
+                self.rect(x - q["vx"] * 0.05 - 1.5, y - q["vy"] * 0.05 - 1.5, 3, 3, hx(q["col"], a * 0.5))
             elif k == "puff":
                 r = 4 + (1 - a) * 6
                 self.oval(x, y, r, r, hx((0.72, 0.70, 0.78), a * 0.8))
@@ -1606,6 +1768,7 @@ class Widget:
                                     "note": ("♪", (0.95, 0.85, 0.5), 14),
                                     "z": ("z", TXT, int(10 + (1 - a) * 5)),
                                     "?": ("?", TXT, 15),
+                                    "dots": ("…", TXT, 15),
                                     "boo": (tr("say.boo"), (0.97, 0.97, 1.0), 16),
                                     "jo": (tr("say.ho"), (1.0, 1.0, 1.0), 13)}[k]
                 tx = x + math.sin(t * 4 + y) * 3
