@@ -1,0 +1,40 @@
+name: Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report this! Please never paste the contents of `~/.claude/.credentials.json` or anything else that contains your Claude session.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows 10, Windows 11, macOS, Ubuntu / Debian, Other Linux]
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install Clawdy?
+      options: [Windows installer, winget, .deb package, macOS .dmg, install.py, git checkout]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Clawdy version
+      description: Right-click Clawdy, the version is shown at the top of the menu.
+      placeholder: v1.0.0
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Screenshots or a short video help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: For window or hover problems, start Clawdy with `CLAWDY_DEBUG=1` and attach `debug.log`. For update problems, attach `update.log`. See docs/how-it-works.md for where they are.
+      render: text

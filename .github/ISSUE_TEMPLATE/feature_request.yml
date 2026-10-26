@@ -1,0 +1,16 @@
+name: Idea or feature request
+description: A new costume, animation, option or anything that would make Clawdy better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: What would you like Clawdy to do? Why would it be useful or fun?
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Sketches, references, examples from other apps…

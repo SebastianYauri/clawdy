@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and show & tell
+    url: https://github.com/SebastianYauri/clawdy/discussions
+    about: Ask a question or share a screenshot of your Clawdy.
