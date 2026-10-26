@@ -15,8 +15,9 @@ Clawdy acts it out: it thinks, types on its laptop, hammers away at commands,
 juggles subagents… and throws confetti when the job is done.
 
 <p align="center">
-  <img src="docs/media/hover.gif" alt="Hovering Clawdy slides out a panel with every usage limit" width="560">
+  <img src="docs/media/desktop.gif" alt="Clawdy in the corner of the screen, reacting while Claude Code edits a file" width="100%">
 </p>
+<p align="center"><sub>Clawdy reacting live to a Claude Code session · <a href="docs/media/desktop.mp4">watch in HD (MP4)</a></sub></p>
 
 ## Features
 
@@ -25,6 +26,9 @@ juggles subagents… and throws confetti when the job is done.
   Green, yellow from 70 %, red from 90 %.
 - **Details on hover.** Move the mouse over it and a panel slides out with every
   limit and when it resets, including paid extra usage if you turned it on.
+
+  <p align="center"><img src="docs/media/hover.gif" alt="Hovering Clawdy slides out a panel with every usage limit" width="520"></p>
+
 - **Reacts to Claude Code.** Through Claude Code hooks, Clawdy knows when Claude
   is thinking, writing code, running commands, reading files, using subagents,
   compacting context, waiting for you or hitting an error.
