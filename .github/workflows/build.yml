@@ -132,6 +132,15 @@ jobs:
           if (-not $menu) { throw "no Start menu shortcut" }
           "installed in $dir with a Start menu shortcut"
 
+          # The uninstall entry Windows registers must match the ProductCode in the winget manifest
+          $code = '{B6C1E0A4-6F2E-4C7A-9C1E-2F7D5A3C8E11}_is1'
+          $arp = Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$code" -ErrorAction SilentlyContinue
+          if (-not $arp) { throw "uninstall entry $code not found under HKCU" }
+          if (Test-Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$code") { throw "unexpected per-machine entry" }
+          "ARP entry: HKCU\...\Uninstall\$code"
+          "  DisplayName=$($arp.DisplayName)  DisplayVersion=$($arp.DisplayVersion)  Publisher=$($arp.Publisher)"
+          "  UninstallString=$($arp.UninstallString)"
+
           # Auto-update: fake a version 99 whose installer is this same one
           $cfg = "$env:APPDATA\clawdy"; New-Item -ItemType Directory -Force $cfg | Out-Null
           '{"setup_done": true}' | Set-Content -NoNewline "$cfg\config.json"
