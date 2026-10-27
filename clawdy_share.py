@@ -169,7 +169,7 @@ def make_card(rows, title):
             draw_text(img, x, bar_y + 26, reset, 2, DIM)
         y += step
     draw_text(img, 30, 590, "CLAWDY", 4, ORANGE)
-    draw_text(img, 1170, 594, LINK, 3, DIM, "right")
+    draw_text(img, 1170, 598, LINK, 2, DIM, "right")
     return img.png()
 
 

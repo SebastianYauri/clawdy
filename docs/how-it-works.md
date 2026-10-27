@@ -77,7 +77,7 @@ From those marks the widget sends a *Claude finished* notification for tasks
 that took 5 minutes or more (configurable: 30 s, 1, 2 or 5 min), and a *Claude needs you* notification (at most one
 per session every 20 seconds) when it stops to ask your permission. (Claude Code's later "waiting for your
 input" reminder is ignored: the task already finished by then.) Turn
-both off with **Notify when Claude finishes** in the menu.
+both off with **Notify when Claude is done** in the menu.
 
 Hooks that belong to other tools are never touched: Clawdy only adds or removes
 entries that point at its own program, and keeps a backup of the previous file

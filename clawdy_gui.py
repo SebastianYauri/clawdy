@@ -965,8 +965,26 @@ class Widget:
             self.popup_menu.close()
         self.popup_menu = PopupMenu(self, ev.x_root, ev.y_root)
 
+    def settings_items(self):
+        w = self
+        return [
+            ("title", tr("menu.settings").rstrip("…."), "v" + VERSION),
+            ("toggle", tr("menu.hooks"), w.v_hooks, w.toggle_hooks),
+            ("toggle", tr("menu.autostart"), w.v_start, w.toggle_start),
+            ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
+            ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
+            ("toggle", tr("menu.alerts"), w.v_alerts, w.toggle_alerts),
+            ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
+            ("toggle", tr("menu.sounds"), w.v_sounds, w.toggle_sounds),
+            ("sep",),
+            ("pills", tr("menu.done_after"), list(DONE_AFTER), lambda: w.done_after, w.set_done_after, 4),
+            ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
+            ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in PopupMenu.COSTUMES],
+             lambda: w.costume_pref, w.set_costume, 3),
+        ]
+
     def open_settings(self):
-        """The right-click menu, opened from the tray: next to Clawdy, or at the pointer when hidden."""
+        """The settings window: next to Clawdy, or at the pointer when Clawdy is hidden."""
         if self.popup_menu:
             self.popup_menu.close()
         if self.hidden:
@@ -977,7 +995,7 @@ class Widget:
             if x < 4:
                 x = self.root.winfo_rootx() + self.root.winfo_width() + 8
             y = self.root.winfo_rooty()
-        self.popup_menu = PopupMenu(self, x, y)
+        self.popup_menu = PopupMenu(self, x, y, items=self.settings_items())
 
     def toggle_hooks(self):
         err = cs.set_hooks(self.v_hooks.get())
@@ -2673,18 +2691,7 @@ class PopupMenu:
             ("action", tr("menu.refresh"), w.refresh),
             ("action", tr("menu.updates"), lambda: w.check_updates(True)),
             ("sep",),
-            ("toggle", tr("menu.hooks"), w.v_hooks, w.toggle_hooks),
-            ("toggle", tr("menu.autostart"), w.v_start, w.toggle_start),
-            ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
-            ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
-            ("toggle", tr("menu.alerts"), w.v_alerts, w.toggle_alerts),
-            ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
-            ("toggle", tr("menu.sounds"), w.v_sounds, w.toggle_sounds),
-            ("sep",),
-            ("pills", tr("menu.done_after"), list(DONE_AFTER), lambda: w.done_after, w.set_done_after, 4),
-            ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
-            ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in self.COSTUMES], lambda: w.costume_pref, w.set_costume, 3),
-            ("sep",),
+            ("action", tr("menu.settings"), lambda: w.root.after(50, w.open_settings)),
             ("action", tr("menu.quit"), w.root.destroy, "danger"),
         ]
         if not items and w.tray and w.tray.active:
@@ -2925,6 +2932,9 @@ class Welcome:
                         variable=self.v_hooks).pack(anchor="w")
         ttk.Checkbutton(body, text=tr("welcome.autostart"),
                         variable=self.v_start).pack(anchor="w", pady=(4, 0))
+        self.v_tasks = tk.BooleanVar(value=True)
+        ttk.Checkbutton(body, text=tr("welcome.tasks"),
+                        variable=self.v_tasks).pack(anchor="w", pady=(4, 0))
         ttk.Label(body, foreground="#777777", wraplength=round(370 * k), justify="left",
                   text=tr("welcome.hint")
                   ).pack(anchor="w", pady=(10, 14))
@@ -2942,6 +2952,7 @@ class Welcome:
 
     def done(self):
         err = cs.setup(hooks=self.v_hooks.get(), autostart=self.v_start.get())
+        cs.update_config(tasks=self.v_tasks.get())
         self.win.destroy()
         self.on_done(err, connect=self.v_connect.get())
 

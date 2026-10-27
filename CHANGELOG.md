@@ -10,7 +10,7 @@ All notable changes to Clawdy are listed here. Versions follow
   menu), or Claude stops halfway to ask
   your permission, you get a notification with the project name, an 8-bit
   sound and a line under Clawdy (**Done!** / **Needs you!**). Turn it off with
-  **Notify when Claude finishes**.
+  **Notify when Claude is done**.
 - **Share my usage.** A new menu item (also in the tray) saves a pixel-art card
   with Clawdy and your limits to your Pictures folder, shows it in your file
   manager and opens a new post on X with the text filled in.

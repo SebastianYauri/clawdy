@@ -153,9 +153,10 @@ Python 3.8+ and tkinter clone the repo and run `python3 install.py`. See
   <img src="docs/media/menu.png" alt="The right-click menu" width="300">
 </p>
 
-From the menu you can share your usage, refresh it, check for updates, change the size
-(small, normal, large), pick a costume, keep the panel always open, and turn
-*React to Claude Code* and *Open at login* on or off.
+The right-click menu has the tools: new chat, **Share my usage**, refresh and
+check for updates. **Settings…** (there or in the tray icon) opens every option:
+React to Claude Code, Open at login, walks, alerts, notifications and how long a
+task must take to notify you, sounds, size and costume.
 
 Clawdy also has an icon in the system tray (the menu bar on macOS). Choose
 **Hide (keep in tray)** to tuck it away: it keeps running in the background and
