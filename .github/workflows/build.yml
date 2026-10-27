@@ -35,8 +35,19 @@ jobs:
           python -m pip install --upgrade pip
           # Build PyInstaller's bootloader from source: the prebuilt one is shared by
           # countless other programs and trips machine-learning antivirus heuristics.
-          $env:PYINSTALLER_COMPILE_BOOTLOADER = "1"
-          python -m pip install --no-binary pyinstaller pyinstaller==6.16.0
+          python -m pip download pyinstaller==6.16.0 --no-binary :all: --no-deps -d pyi-src
+          tar -xzf (Get-ChildItem pyi-src\pyinstaller-*.tar.gz).FullName -C pyi-src
+          $src = (Get-ChildItem pyi-src -Directory | Select-Object -First 1).FullName
+          $boot = "$src\PyInstaller\bootloader\Windows-64bit-intel\runw.exe"
+          $before = (Get-FileHash $boot).Hash
+          Push-Location "$src\bootloader"
+          python ./waf all --target-arch=64bit
+          if ($LASTEXITCODE -ne 0) { throw "bootloader build failed" }
+          Pop-Location
+          $after = (Get-FileHash $boot).Hash
+          if ($before -eq $after) { throw "the bootloader was not rebuilt" }
+          "bootloader rebuilt: $before -> $after"
+          python -m pip install $src
           python -m pip install pystray==0.19.5 pillow
           # Version resource (Properties > Details) with the release version
           $parts = ($env:VERSION.Split('.') + @('0','0','0','0'))[0..3] -join ', '
