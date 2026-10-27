@@ -10,6 +10,8 @@ All notable changes to Clawdy are listed here. Versions follow
   usage** prompt. One click (and one confirmation) installs Claude Code in the
   background and opens the browser: just click Authorize, no terminal or
   commands. When Claude Code is installed but signed out, the click just signs in.
+- The welcome screen offers to connect your usage right away when Claude Code
+  isn't set up, so the only step left is clicking Authorize in the browser.
 
 ## 1.2.0
 

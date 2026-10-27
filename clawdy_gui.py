@@ -937,13 +937,15 @@ class Widget:
         else:
             self._next_fetch = now + POLL
 
-    def setup_claude_code(self):
+    def setup_claude_code(self, ask=True):
         """Install Claude Code if needed and sign in, without any terminal: the only
         thing the user does is approve in the browser."""
         from tkinter import messagebox
-        login_only = self.st.need == "login"
-        if not messagebox.askyesno(tr("need.ask_title"), tr("need.ask_login" if login_only else "need.ask"),
-                                   parent=self.root):
+        if self.setup_phase:
+            return
+        login_only = cs.claude_code_path() is not None
+        if ask and not messagebox.askyesno(tr("need.ask_title"),
+                                           tr("need.ask_login" if login_only else "need.ask"), parent=self.root):
             return
         self.setup_phase = "browser" if login_only else "installing"
 
@@ -2681,6 +2683,9 @@ class Welcome:
 
         self.v_hooks = tk.BooleanVar(value=True)
         self.v_start = tk.BooleanVar(value=True)
+        self.v_connect = tk.BooleanVar(value=not cs.logged_in())
+        if not cs.logged_in():              # only the desktop app: offer to set Claude Code up
+            ttk.Checkbutton(body, text=tr("welcome.connect"), variable=self.v_connect).pack(anchor="w", pady=(0, 4))
         ttk.Checkbutton(body, text=tr("welcome.hooks"),
                         variable=self.v_hooks).pack(anchor="w")
         ttk.Checkbutton(body, text=tr("welcome.autostart"),
@@ -2703,7 +2708,7 @@ class Welcome:
     def done(self):
         err = cs.setup(hooks=self.v_hooks.get(), autostart=self.v_start.get())
         self.win.destroy()
-        self.on_done(err)
+        self.on_done(err, connect=self.v_connect.get())
 
     def skip(self):
         """Closing the welcome changes nothing; it shows again next time."""
@@ -2781,9 +2786,11 @@ def run(demo=False, selftest=0):
 
     app = {"widget": None, "welcome": None}
 
-    def start(err=None):
+    def start(err=None, connect=False):
         app["welcome"] = None
         w = app["widget"] = Widget(root, demo=demo)
+        if connect:                            # agreed in the welcome screen: no second question
+            root.after(1500, lambda: w.setup_claude_code(ask=False))
         if err:
             w.st.error = err[:60]
         root.deiconify()

@@ -109,10 +109,12 @@ STRINGS = {
                       "works, I act it out: thinking, typing, hammering…",
                       "Te muestro cuánto llevas usado de Claude. Y mientras Claude Code trabaja, "
                       "yo hago lo mismo que él: pienso, escribo, martillo…"),
-    "welcome.no_login": ("Your usage comes from Claude Code, which isn't set up here yet (the desktop "
-                         "app alone isn't enough). Once I'm open, click my bottom line and I'll set it up.",
-                         "Tu uso viene de Claude Code, que aún no está configurado aquí (la app de "
-                         "escritorio sola no basta). Cuando me abras, haz clic abajo en mí y lo configuro."),
+    "welcome.no_login": ("Your usage comes from Claude Code, which isn't set up on this computer yet "
+                         "(the desktop app alone isn't enough). I can set it up for you:",
+                         "Tu uso viene de Claude Code, que aún no está configurado en esta computadora "
+                         "(la app de escritorio sola no basta). Puedo configurarlo por ti:"),
+    "welcome.connect": ("Connect my usage now (you'll approve in your browser)",
+                        "Conectar mi uso ahora (lo apruebas en tu navegador)"),
     "welcome.hooks": ("React to what Claude Code is doing", "Reaccionar a lo que hace Claude Code"),
     "welcome.autostart": ("Open me when the computer starts", "Abrirme al encender la computadora"),
     "welcome.hint": ("You can change this anytime by right-clicking me.",
