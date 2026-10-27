@@ -86,12 +86,19 @@ login.
 > without a paid code-signing certificate. Click **More info** → **Run anyway**.
 > It only happens once.
 >
-> **macOS says it can't verify the developer?** Open **System Settings →
-> Privacy & Security** and click **Open Anyway**. Then, when macOS asks whether
-> *Clawdy* may use *Claude Code-credentials*, click **Always Allow**: that's
-> your Claude Code session, which Clawdy needs to read your usage.
-> Because the macOS build isn't signed with a paid Apple Developer ID yet, macOS
-> may ask this again after an update.
+> **macOS says "Apple could not verify Clawdy is free of malware"?** The Mac build
+> isn't signed with a paid Apple Developer ID yet, so the first launch needs one
+> extra step (later updates don't):
+> 1. Click **Done** in that dialog.
+> 2. Open **System Settings → Privacy & Security**, scroll down to *"Clawdy was
+>    blocked…"* and click **Open Anyway**, then confirm with your password.
+>
+> Prefer the Terminal? `xattr -dr com.apple.quarantine /Applications/Clawdy.app`
+> does the same.
+>
+> When macOS then asks whether *Clawdy* may use *Claude Code-credentials*, click
+> **Always Allow**: that's your Claude Code session, which Clawdy needs to read
+> your usage. macOS may ask this again after an update.
 
 **Other systems** (Intel Macs, Fedora, Arch…): with Python 3.8+ and tkinter,
 clone the repo and run `python3 install.py`. See [Building](docs/building.md).

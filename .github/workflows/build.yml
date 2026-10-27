@@ -387,7 +387,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          (cd out && sha256sum windows/Clawdy-Setup.exe linux/*.deb macos/Clawdy-mac.dmg macos/Clawdy-mac.zip \
+            | sed 's#  [a-z]*/#  #' > SHA256SUMS.txt && cat SHA256SUMS.txt)
           gh release create "$GITHUB_REF_NAME" out/windows/Clawdy-Setup.exe out/linux/*.deb \
-            out/macos/Clawdy-mac.dmg out/macos/Clawdy-mac.zip \
+            out/macos/Clawdy-mac.dmg out/macos/Clawdy-mac.zip out/SHA256SUMS.txt \
             --title "Clawdy ${GITHUB_REF_NAME#v}" \
             --notes-file packaging/release-notes.md

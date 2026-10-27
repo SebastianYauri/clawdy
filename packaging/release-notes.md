@@ -15,8 +15,9 @@ then **Show more** → **Keep anyway**. New apps aren't "commonly downloaded" ye
 **Windows says "Windows protected your PC"?** Click **More info** → **Run anyway**.
 That's normal for apps without a paid signing certificate, and only happens once.
 
-**macOS can't verify the developer?** Open **System Settings → Privacy & Security**
-and click **Open Anyway**. When asked about *Claude Code-credentials*, click
-**Always Allow**: it's your Claude Code session, needed to read your usage.
+**macOS says "Apple could not verify Clawdy is free of malware"?** Click **Done**, then open
+**System Settings → Privacy & Security**, scroll down and click **Open Anyway** (only the first
+time). When asked about *Claude Code-credentials*, click **Always Allow**: it's your Claude Code
+session, needed to read your usage.
 
 See the [changelog](https://github.com/SebastianYauri/clawdy/blob/main/CHANGELOG.md) for what's new.
