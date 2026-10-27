@@ -78,7 +78,10 @@ class Tray:
             Item(tr("menu.costume"), choice([(c, tr("costume." + c)) for c in PopupMenu.COSTUMES],
                                             lambda: w.costume_pref, w.set_costume)),
         )
+        from clawdy_version import VERSION
         return P.Menu(
+            Item("Clawdy v" + VERSION, None, enabled=False),
+            P.Menu.SEPARATOR,
             Item(lambda item: tr("tray.hide") if w.visible() else tr("tray.show"),
                  call(w.toggle_visible), default=True),
             Item(tr("menu.chat_app" if w.has_app else "menu.chat_web"), call(w.new_chat)),
