@@ -37,6 +37,7 @@ clawdy.py --setup       connect to Claude Code and open at login
 clawdy.py --uninstall   disconnect everything and delete its data
 clawdy.py --quit        close the running copy
 clawdy.py --demo        cycle through every animation with made-up data
+clawdy.py --walk        send the running Clawdy for a walk right now
 clawdy.py --hook        called by Claude Code on every event
 ```
 
@@ -57,6 +58,7 @@ clawdy.py --hook        called by Claude Code on every event
 | `clawdy_update.py` | update checks and installers |
 | `clawdy_i18n.py` | English and Spanish text |
 | `clawdy_tray.py` | tray / menu bar icon |
+| `clawdy_walk.py` | desktop walks |
 | `clawdy_version.py` | version number, replaced by CI from the git tag |
 | `packaging/` | `.deb` script, Inno Setup script, CI hook test |
 
@@ -79,7 +81,7 @@ pip install pyinstaller pystray pillow
 pyinstaller --noconfirm --windowed --name Clawdy --icon assets\icon.ico `
   --add-data "assets;assets" --hidden-import clawdy_gui --hidden-import clawdy_hook `
   --hidden-import clawdy_system --hidden-import clawdy_update --hidden-import clawdy_version `
-  --hidden-import clawdy_i18n --hidden-import clawdy_tray --hidden-import pystray._win32 clawdy.py
+  --hidden-import clawdy_i18n --hidden-import clawdy_tray --hidden-import clawdy_walk --hidden-import pystray._win32 clawdy.py
 iscc /DAppVersion=1.2.3 packaging\windows\Clawdy.iss
 ```
 
@@ -91,7 +93,7 @@ pyinstaller --noconfirm --windowed --name Clawdy --icon assets/icon.png \
   --osx-bundle-identifier com.clawdy.app --add-data "assets:assets" \
   --hidden-import clawdy_gui --hidden-import clawdy_hook --hidden-import clawdy_system \
   --hidden-import clawdy_update --hidden-import clawdy_version --hidden-import clawdy_i18n \
-  --hidden-import clawdy_tray --hidden-import pystray._darwin clawdy.py
+  --hidden-import clawdy_tray --hidden-import clawdy_walk --hidden-import pystray._darwin clawdy.py
 codesign --force --deep -s - dist/Clawdy.app
 ```
 

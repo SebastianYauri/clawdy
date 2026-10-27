@@ -71,6 +71,7 @@ STRINGS = {
     "menu.hooks": ("React to Claude Code", "Reaccionar a Claude Code"),
     "menu.autostart": ("Open at login", "Abrir al encender"),
     "menu.pin": ("Keep panel open", "Panel siempre abierto"),
+    "menu.walks": ("Walks around the desktop", "Paseos por el escritorio"),
     "menu.size": ("Size", "Tamaño"),
     "menu.costume": ("Costume", "Disfraz"),
     "menu.quit": ("Quit", "Salir"),

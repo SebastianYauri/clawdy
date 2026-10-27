@@ -39,6 +39,11 @@ juggles subagents… and throws confetti when the job is done.
 - **Costumes.** Witch, pumpkin, ghost, vampire and Santa, each with its own
   tricks and themed props. On *Auto* it dresses up by itself for Halloween and
   Christmas.
+- **Desktop walks.** While you're using Claude, now and then Clawdy leaves its
+  porthole: on Windows it rappels down to the taskbar, strolls along it and
+  climbs back up a rope; on Linux and macOS it hangs from the top of the screen,
+  swings along and slides back down a rope. Click it to get a wave. You can turn
+  walks off from the right-click menu.
 - **One click to a new chat.** The **+** button opens a new chat in the Claude
   desktop app, or on claude.ai if the app isn't installed.
 - **Updates itself.** Checks GitHub Releases at start-up and every 6 hours.

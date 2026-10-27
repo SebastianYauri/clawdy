@@ -118,5 +118,14 @@ pixel by pixel into images, and only redrawn when their values change.
 Everything else that doesn't animate is cached in a static layer; at 30 fps the
 widget stays at a few percent of one CPU core.
 
+## Desktop walks
+
+While you're using Claude (Claude Code had activity in the last 10 minutes, or
+the Claude app or Claude Code is running), every 10–20 minutes Clawdy goes for a
+short walk in its own small borderless window, with the rope as a second thin
+window. On Windows it walks on the taskbar of the monitor it's on; on Linux and
+macOS it hangs below the top bar / menu bar, or from the top edge of a monitor
+without one. It hurries home if Claude Code needs you or hits an error.
+
 Set `CLAWDY_DEBUG=1` to write a `debug.log` with window and hover events to the
 cache folder, and `CLAWDY_LANG=en` or `CLAWDY_LANG=es` to force a language.

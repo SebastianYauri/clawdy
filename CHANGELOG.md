@@ -16,6 +16,10 @@ All notable changes to Clawdy are listed here. Versions follow
   and refreshes the moment it does), retries within seconds when the network
   isn't up yet, and refreshes as soon as the computer wakes from sleep.
 - Limits that already reset show 0 % instead of yesterday's numbers.
+- Desktop walks: while you're using Claude Code or the Claude app, now and
+  then Clawdy goes for a walk on the taskbar (Windows) or hangs from the top of
+  the screen (Linux, macOS) and climbs back home on a rope. Toggle it from the
+  right-click menu; `clawdy --walk` sends it out right away.
 - Tray icon (menu bar on macOS) to show or hide Clawdy, open a new chat,
   refresh, change settings and quit. Hidden, Clawdy keeps running in the
   background.

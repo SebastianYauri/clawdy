@@ -27,7 +27,7 @@ RELEASES = "https://github.com/%s/releases/latest" % REPO
 API = "https://api.github.com/repos/%s/releases/latest" % REPO
 RAW = "https://raw.githubusercontent.com/%s/%s/%s"
 SOURCE_FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
-                "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py",
+                "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py",
                 "assets/icon.png"]
 RETRY_AFTER = 24 * 3600             # don't retry a failed version for a day
 

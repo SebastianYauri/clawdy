@@ -344,6 +344,30 @@ def claude_app_installed():
     return bool(out)
 
 
+def claude_running():
+    """Is the Claude desktop app or Claude Code running? Cheap enough to call every ~30 s."""
+    names = {"claude", "claude-desktop", "claude.exe"}
+    try:
+        if WIN:
+            out = subprocess.run(["tasklist", "/FO", "CSV", "/NH"], capture_output=True, text=True,
+                                 timeout=5, creationflags=0x08000000).stdout
+            return any(line.split(",")[0].strip('"').lower() in names for line in out.splitlines())
+        if MAC:
+            out = subprocess.run(["ps", "-axco", "comm"], capture_output=True, text=True, timeout=5).stdout
+            return any(line.strip().lower() in names for line in out.splitlines())
+        for pid in os.listdir("/proc"):
+            if pid.isdigit():
+                try:
+                    with open("/proc/%s/comm" % pid) as f:
+                        if f.read().strip().lower() in names:
+                            return True
+                except OSError:
+                    pass
+    except Exception:
+        pass
+    return False
+
+
 def open_new_chat(use_app):
     if use_app:
         try:

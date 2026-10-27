@@ -18,6 +18,7 @@ import clawdy_update as cu
 from clawdy_i18n import STRINGS, t as tr
 from clawdy_system import SESSIONS
 from clawdy_tray import Tray
+from clawdy_walk import Walk
 from clawdy_version import VERSION
 
 tk = None            # imported in run(): the hook doesn't need tkinter
@@ -46,6 +47,8 @@ VARIANTS = {"thinking": ("bubble", "bulb", "pace"), "typing": ("laptop", "coffee
             "happy": ("confetti", "dance", "fireworks")}
 VARIANT_SECS = 7.0
 NAP_AFTER = 15 * 60                # no Claude Code activity for this long: take a nap
+TRIP_EVERY = (10 * 60, 20 * 60)    # while you use Claude, now and then Clawdy goes for a walk
+IN_USE_FOR = 10 * 60               # Claude Code activity this recent counts as "using Claude"
 # Intro once fresh usage arrives: walk in carrying a ball, throw it down, rings fill up.
 INTRO_WALK, INTRO_WIND, INTRO_FILL, INTRO_END = 1.4, 0.35, 0.9, 4.2
 PLUS = (93, 11)                     # new chat button, in the free corner
@@ -547,6 +550,11 @@ class Widget:
         self.v_pin = tk.BooleanVar(value=self.pinned)
         self.popup_menu = None
         self.hidden = False
+        self.v_walks = tk.BooleanVar(value=cs.load_config().get("walks", True))
+        self.walk, self.away = None, False
+        soon = os.environ.get("CLAWDY_WALK_IN")
+        self.next_trip = time.time() + (float(soon) if soon else random.uniform(*TRIP_EVERY))
+        self._walk_clock = time.perf_counter()
         self.tray = Tray(self, cs.resource("assets", "icon.png")) if not demo else None
 
         self.fam = self.pick_font(["Segoe UI", "DejaVu Sans", "Helvetica Neue", "Helvetica"])
@@ -935,8 +943,53 @@ class Widget:
             return 0.0
         return ease(clamp((time.time() - self.fill_t0) / INTRO_FILL))
 
+    def maybe_walk(self, force=False):
+        now = time.time()
+        if self.walk or (not force and (now < self.next_trip or not self.v_walks.get())):
+            return
+        if not force and not self.using_claude(now):
+            self.next_trip = now + 60          # only while you're using Claude
+            return
+        busy = (self.work in ("notification", "error") or self.hidden or self.e > 0 or self._drag
+                or not self.ready or self.intro_t0 is not None or self.popup_menu)
+        if not force:
+            busy = busy or self.col_in or self.panel_in
+        if busy:
+            self.next_trip = now + 60
+            return
+        try:
+            self.walk = Walk(self)
+            self.away = True
+        except Exception:
+            self.walk = None
+        self.next_trip = now + random.uniform(*TRIP_EVERY)
+
+    def using_claude(self, now):
+        if now - self._last_work < IN_USE_FOR:
+            return True
+        if now - getattr(self, "_running_at", 0) > 30:
+            self._running_at = now
+            self._running = cs.claude_running()
+        return self._running
+
+    def end_walk(self, home=True):
+        if self.walk:
+            self.walk.close()
+        self.walk, self.away = None, False
+        if home:                               # back in the porthole with a little hop
+            self.force, self.act_t = "jump", 0.0
+            for i in range(7):
+                a = math.pi + i * math.pi / 6
+                self.spawn("spark", SCENE_W / 2, 108, math.cos(a) * 60, math.sin(a) * 50, 0.7)
+
+    def toggle_walks(self):
+        cs.update_config(walks=self.v_walks.get())
+        if not self.v_walks.get() and self.walk:
+            self.end_walk()
+
     def sync(self):
         """Runs every 2 s without touching the network unless a request is due."""
+        self.maybe_walk()
         if self.demo and not self.ready and time.time() - self.t0 > 1.5:
             self.start_intro()
         if not self.demo:
@@ -1003,8 +1056,17 @@ class Widget:
             self.root.destroy()
             return
         if self.hidden:                     # in the tray: nothing to draw
+            if self.walk:
+                self.end_walk(home=False)
             self.root.after(500, self.tick)
             return
+        now_pc = time.perf_counter()
+        wdt, self._walk_clock = min(now_pc - self._walk_clock, 0.1), now_pc
+        if self.walk:
+            if self.work in ("notification", "error") or self._drag or not self.v_walks.get():
+                self.end_walk()                 # Claude Code needs you: hurry home
+            elif not self.walk.step(wdt):
+                self.end_walk()
         try:
             if not self._placed:
                 if not self.root.winfo_ismapped():
@@ -1070,6 +1132,9 @@ class Widget:
             for i in range(3):
                 a = 0.25 + 0.6 * max(0.0, math.sin(t * 4 - i * 0.8))
                 self.oval(cx - 14 + i * 14, by - 24, 4, 4, hx(DIM, a))
+            return
+        if self.away:                          # out for a walk: the porthole is empty
+            self.draw_parts(dt, t)
             return
         if self.intro_t0 is not None:
             if self.draw_intro(cx, by, now - self.intro_t0, dt, t):
@@ -2347,6 +2412,7 @@ class PopupMenu:
             ("toggle", tr("menu.hooks"), w.v_hooks, w.toggle_hooks),
             ("toggle", tr("menu.autostart"), w.v_start, w.toggle_start),
             ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
+            ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
             ("sep",),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in self.COSTUMES], lambda: w.costume_pref, w.set_costume, 3),
@@ -2696,6 +2762,8 @@ def run(demo=False, selftest=0):
         if msg.startswith(b"quit"):
             root.destroy()
             return
+        if msg.startswith(b"walk") and app["widget"]:
+            app["widget"].maybe_walk(force=True)
         if msg.startswith(b"show"):
             if app["widget"]:
                 app["widget"].greet()

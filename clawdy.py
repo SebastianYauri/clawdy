@@ -7,6 +7,7 @@
     clawdy.py --uninstall   disconnect everything and delete its data
     clawdy.py --quit        close the running copy
     clawdy.py --demo        cycle through every animation with made-up data
+    clawdy.py --walk        send the running Clawdy for a walk right now
 """
 import os
 import sys
@@ -24,6 +25,8 @@ def main(argv):
     if "--quit" in argv:                 # used by the installers when updating
         clawdy_system.ask_running_to_quit()
         return 0
+    if "--walk" in argv:
+        return 0 if clawdy_system.send_to_running(b"walk") else 1
     if "--uninstall" in argv:
         clawdy_system.uninstall()
         return 0
