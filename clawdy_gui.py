@@ -21,6 +21,7 @@ from clawdy_tray import Tray
 from clawdy_walk import Walk
 import clawdy_sessions as sessions
 import clawdy_share
+import clawdy_skins
 from clawdy_version import VERSION
 
 tk = None            # imported in run(): the hook doesn't need tkinter
@@ -598,6 +599,7 @@ class Widget:
         self._marks, self._asked = None, {}
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.held = False                    # being carried around with the mouse
+        self.skins = clawdy_skins.Skins(tk)  # costumes drawn in a pixel art editor, if any
         self.hist = self.load_history()      # [(time, {limit: (percent, resets_at)})] for the pace
         self._fresh = False                  # new usage arrived (set by the fetch thread)
         self._renew = {}                     # limits worth announcing when they reset
@@ -1078,7 +1080,19 @@ class Widget:
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in PopupMenu.COSTUMES],
              lambda: w.costume_pref, w.set_costume, 3),
+            ("action", tr("menu.design"), w.design_costumes),
         ]
+
+    def design_costumes(self):
+        """Export today's costumes as PNG templates and open the folder to edit them."""
+        try:
+            costumes = [c for c in PopupMenu.COSTUMES if c not in ("auto", "none")]
+            colors = {"X": hx(ORANGE), "A": hx(ORANGE), "L": hx(ORANGE_D), "E": hx(DARK)}
+            clawdy_skins.export_templates(self, costumes, tk, SPRITE, colors)
+            clawdy_share.show(clawdy_skins.folder())
+        except Exception as e:
+            self.log("design", e)
+            self.flash(tr("share.failed"), 4)
 
     def open_settings(self):
         """The settings window: next to Clawdy, or at the pointer when Clawdy is hidden."""
@@ -2206,6 +2220,11 @@ class Widget:
     def draw_costume(self, xf, c, layer, t, glow, eye, eye_dx):
         """Costumes share Clawdy's transform, so they jump, spin and squash with
         it. Sprite coordinates: body x ±30, y -27..15."""
+        runs = self.skins.runs(c, layer)            # a PNG from the skins folder wins
+        if runs is not None:
+            for x, y, w, h, col in runs:
+                self.px_rect(xf, x, y, col, w, h)
+            return
         if c == "none":
             return
 

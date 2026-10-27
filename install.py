@@ -20,7 +20,7 @@ MENU = os.path.join(DATA, "applications", "clawdy.desktop")
 ICON = os.path.join(DATA, "icons", "hicolor", "256x256", "apps", "clawdy.png")
 FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
          "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py",
-         "clawdy_sessions.py", "clawdy_share.py"]
+         "clawdy_sessions.py", "clawdy_share.py", "clawdy_skins.py"]
 
 
 def add_to_menu(main_py):
@@ -63,6 +63,8 @@ def main():
         shutil.copy2(os.path.join(SRC, f), os.path.join(DEST, f))
     for asset in ("icon.png", "alert.wav", "done.wav", "ask.wav"):
         shutil.copy2(os.path.join(SRC, "assets", asset), os.path.join(DEST, "assets", asset))
+    shutil.rmtree(os.path.join(DEST, "assets", "skins"), ignore_errors=True)
+    shutil.copytree(os.path.join(SRC, "assets", "skins"), os.path.join(DEST, "assets", "skins"))
     add_to_menu(main_py)
     subprocess.Popen([sys.executable, main_py], start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

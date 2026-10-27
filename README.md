@@ -216,6 +216,17 @@ off as a bat, the ghost floats around and says boo, the witch rides her broom,
 the pumpkin bounces, Frankenstein climbs down to the bottom of the screen and
 stomps along it, and Santa keeps his hat on.
 
+### Draw your own costumes
+
+Costumes are small PNG images, so you can redraw them in any pixel art editor:
+[Pixelorama](https://pixelorama.org) (free, Windows/macOS/Linux), Aseprite,
+LibreSprite or Piskel. Open **Settings… → Design costumes…**: Clawdy exports
+today's costumes and a reference image of its body into a folder and opens it.
+Copy one out of `templates`, edit it, save, and Clawdy uses it within seconds,
+still jumping, spinning and squashing with it. Each image is 32×32 and every
+pixel is half a Clawdy pixel; `<costume>_back.png` goes behind Clawdy. Delete
+your file to go back to the built-in costume.
+
 ## Does it cost anything?
 
 No. Clawdy reads the same numbers you see with `/usage` in Claude Code, using

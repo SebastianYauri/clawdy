@@ -93,6 +93,7 @@ STRINGS = {
     "menu.done_after": ("Notify for tasks longer than", "Avisar si la tarea tarda más de"),
     "menu.share": ("Share my usage", "Compartir mi uso"),
     "menu.settings": ("Settings…", "Ajustes…"),
+    "menu.design": ("Design costumes…", "Diseñar disfraces…"),
     "task.done_title": ("Claude finished", "Claude terminó"),
     "task.done_body": ("{where} · took {t}", "{where} · tardó {t}"),
     "task.done_short": ("Done!", "¡Listo!"),

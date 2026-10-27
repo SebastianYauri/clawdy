@@ -3,6 +3,16 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.4
+
+- **Redrawn costumes.** The witch, Santa, Frankenstein and vampire costumes are
+  now pixel art drawn at twice Clawdy's resolution, with outlines, shading and
+  highlights (the vampire's cape has a high collar and a crimson lining).
+- **Draw your own costumes.** Costumes are 32×32 PNGs. **Settings… → Design
+  costumes…** exports them, with a reference of Clawdy's body, and opens the
+  folder; edit one in any pixel art editor (Pixelorama is free) and Clawdy
+  picks it up within seconds, animations included.
+
 ## 1.4.3
 
 - **New costume: Frankenstein.** Flat-top hair, stitches and neck bolts; it
