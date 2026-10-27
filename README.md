@@ -39,6 +39,8 @@ juggles subagents… and throws confetti when the job is done.
 - **Costumes.** Witch, pumpkin, ghost, vampire and Santa, each with its own
   tricks and themed props. On *Auto* it dresses up by itself for Halloween and
   Christmas.
+- **Alerts near your limits.** At 80 % and 95 % of any limit Clawdy raises the
+  alarm and sends a system notification, once per reset window.
 - **Desktop walks.** While you're using Claude, now and then Clawdy leaves its
   porthole: on Windows it rappels down to the taskbar, strolls along it and
   climbs back up a rope; on Linux and macOS it hangs from the top of the screen,

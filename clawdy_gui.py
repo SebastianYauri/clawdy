@@ -50,6 +50,7 @@ VARIANT_SECS = 7.0
 NAP_AFTER = 15 * 60                # no Claude Code activity for this long: take a nap
 TRIP_EVERY = (10 * 60, 20 * 60)    # while you use Claude, now and then Clawdy goes for a walk
 IN_USE_FOR = 10 * 60               # Claude Code activity this recent counts as "using Claude"
+ALERT_AT = (80, 95)                 # percent: Clawdy raises the alarm (once per reset window)
 # Intro once fresh usage arrives: walk in carrying a ball, throw it down, rings fill up.
 INTRO_WALK, INTRO_WIND, INTRO_FILL, INTRO_END = 1.4, 0.35, 0.9, 4.2
 PLUS = (93, 11)                     # new chat button, in the free corner
@@ -554,6 +555,9 @@ class Widget:
         self.popup_menu = None
         self.hidden = False
         self.v_walks = tk.BooleanVar(value=cs.load_config().get("walks", True))
+        self.v_alerts = tk.BooleanVar(value=cs.load_config().get("alerts", True))
+        self._alerts = []                   # filled by the fetch thread, shown on the Tk thread
+        self.alarm_until = 0.0
         self.walk, self.away = None, False
         self.setup_phase = None              # installing Claude Code / waiting for the browser
         soon = os.environ.get("CLAWDY_WALK_IN")
@@ -974,6 +978,8 @@ class Widget:
 
     def _after_fetch(self, outcome):
         now = time.time()
+        if outcome == "ok" and self.st.data:
+            self.queue_alerts()
         if not self.ready and self.st.data and not self.st.error and self.st.fresh():
             self.start_intro()
         if outcome == "offline":                # e.g. right after boot: retry soon, then back off
@@ -1079,6 +1085,37 @@ class Widget:
                 a = math.pi + i * math.pi / 6
                 self.spawn("spark", SCENE_W / 2, 108, math.cos(a) * 60, math.sin(a) * 50, 0.7)
 
+    def queue_alerts(self):
+        """Note limits that just crossed 80 % / 95 %, once per reset window."""
+        if not self.v_alerts.get():
+            return
+        cfg = cs.load_config()
+        seen = cfg.get("alerted") or []
+        new = []
+        for name, p, reset in bars(self.st.data):
+            for level in ALERT_AT:
+                key = "%s|%s|%d" % (name, reset or "", level)
+                if p >= level and key not in seen:
+                    seen.append(key)
+                    if level == max(l for l in ALERT_AT if p >= l):   # only the highest one now
+                        new.append((name, p, reset))
+        if new:
+            cs.update_config(alerted=seen[-60:])
+            self._alerts.extend(new)
+        elif len(seen) != len(cfg.get("alerted") or []):
+            cs.update_config(alerted=seen[-60:])
+
+    def show_alerts(self):
+        while self._alerts:
+            name, p, reset = self._alerts.pop(0)
+            body = tr("alert.body", t=until(reset)) if reset else tr("alert.body_nr")
+            cs.notify(tr("alert.title", name=name, p=round(p)), body, self.tray)
+            self.force, self.act_t = "alarm", 0.0
+            self.alarm_until = time.time() + 4.0
+
+    def toggle_alerts(self):
+        cs.update_config(alerts=self.v_alerts.get())
+
     def toggle_walks(self):
         cs.update_config(walks=self.v_walks.get())
         if not self.v_walks.get() and self.walk:
@@ -1087,6 +1124,8 @@ class Widget:
     def sync(self):
         """Runs every 2 s without touching the network unless a request is due."""
         self.maybe_walk()
+        if self._alerts and not self.hidden:
+            self.show_alerts()
         if self.demo and not self.ready and time.time() - self.t0 > 1.5:
             self.start_intro()
         if not self.demo:
@@ -1276,6 +1315,8 @@ class Widget:
         p = self.act_t / DUR
         if work:
             act = work
+        if time.time() < self.alarm_until:      # a limit alert beats everything else
+            act = "alarm"
 
         dy = sx = sy = rot = 0.0
         glow = 0.6
@@ -1590,6 +1631,15 @@ class Widget:
             if self.emit <= 0:
                 self.spawn("dust", cx + self.pos + random.uniform(-15, 15), by - SH, 0, -25, 1.0)
                 self.emit = 0.15
+        elif act == "alarm":                     # a limit is getting close
+            dy = -abs(math.sin(t * 9)) * 7
+            arm_l = arm_r = -9 + math.sin(t * 18) * 3
+            eye = "scared"
+            self.pos += math.sin(t * 40) * 0.8
+            props.append("err")
+            if self.emit <= 0:
+                self.spawn("drop", cx + self.pos + SW / 2 - 6, by - SH + 6 + dy, 14, -16, 0.8)
+                self.emit = 0.25
         elif act == "notification":
             dy = -abs(math.sin(t * 7)) * 6
             arm_l = arm_r = -8 + math.sin(t * 14) * 3
@@ -2516,6 +2566,7 @@ class PopupMenu:
             ("toggle", tr("menu.autostart"), w.v_start, w.toggle_start),
             ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
             ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
+            ("toggle", tr("menu.alerts"), w.v_alerts, w.toggle_alerts),
             ("sep",),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in self.COSTUMES], lambda: w.costume_pref, w.set_costume, 3),

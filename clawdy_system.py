@@ -550,6 +550,28 @@ def focus_session(pid):
     return False
 
 
+def notify(title, body, tray=None):
+    """A system notification. Best effort; never raises."""
+    try:
+        if WIN:
+            if tray and tray.active:
+                tray.icon.notify(body, title)
+                return True
+            return False
+        if MAC:
+            esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')
+            subprocess.Popen(["osascript", "-e", 'display notification "%s" with title "%s"' % (esc(body), esc(title))])
+            return True
+        if shutil.which("notify-send"):
+            icon = resource("assets", "icon.png")
+            subprocess.Popen(["notify-send", "-a", APP, "-i", icon, title, body],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def claude_running():
     """Is the Claude desktop app or Claude Code running? Cheap enough to call every ~30 s."""
     names = {"claude", "claude-desktop", "claude.exe"}

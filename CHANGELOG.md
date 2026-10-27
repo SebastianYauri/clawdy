@@ -3,6 +3,12 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.0
+
+- Alerts near your limits: when any limit crosses 80 % or 95 %, Clawdy raises
+  the alarm and you get a system notification, once per reset window. Turn it
+  off from the right-click menu.
+
 ## 1.3.1
 
 - Windows build goes back to PyInstaller's stock bootloader. The self-compiled
