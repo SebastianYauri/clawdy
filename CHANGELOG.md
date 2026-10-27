@@ -3,6 +3,15 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.3
+
+- **Pick Clawdy up.** Drag it and it dangles from the mouse: it stretches with
+  joy going up ("Wheee!"), squashes and sweats going down, and swings behind the
+  movement. Shake it (or throw it) and it gets dizzy, with X eyes and stars
+  circling its head; put it down gently and it bounces.
+- **Share my usage** now opens the image in your viewer instead of a post on X.
+- Menus close half a second after the mouse leaves them, and when you click Clawdy.
+
 ## 1.4.2
 
 - Menus close by themselves: if the mouse never reaches one (for example

@@ -146,7 +146,7 @@ Python 3.8+ and tkinter clone the repo and run `python3 install.py`. See
 | Hover | Slide out the panel with every limit and its reset time |
 | Click Clawdy | Your Claude Code chats: bring an open one to the front, resume a recent one, or start a new chat in a recent project |
 | Click **+** | Start a new Claude chat |
-| Drag | Move Clawdy anywhere |
+| Drag | Move Clawdy anywhere: it dangles from the mouse, and gets dizzy if you shake it |
 | Right-click | Open the menu |
 | Tray / menu bar icon | Show or hide Clawdy, new chat, share, refresh, every setting, quit |
 

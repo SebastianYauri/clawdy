@@ -572,6 +572,10 @@ class Widget:
         self.done_after = int(cs.load_config().get("done_after", 300))
         self._marks, self._asked = None, {}
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
+        self.held = False                    # being carried around with the mouse
+        self._vel, self._last_drag = (0.0, 0.0), None
+        self._shakes, self._shake_dir = [], 0
+        self.dizzy_until = self.land_until = 0.0
         self.walk, self.away = None, False
         self.setup_phase = None              # installing Claude Code / waiting for the browser
         soon = os.environ.get("CLAWDY_WALK_IN")
@@ -880,6 +884,16 @@ class Widget:
 
     def release(self, ev):
         self._drag = False
+        if self.held:
+            self.held = False
+            now = time.time()
+            shaken = len([t for t in self._shakes if now - t < 1.2]) >= 4
+            if shaken or math.hypot(*self._vel) > 2500:
+                self.dizzy_until = now + 2.4     # shaken or thrown: dizzy
+                self.note_until, self.note_text, self.note_color = self.dizzy_until, tr("drag.dizzy"), ORANGE
+            else:
+                self.land_until = now + 0.6      # put down: a little bounce
+            self._vel, self._last_drag, self._shakes, self._shake_dir = (0.0, 0.0), None, [], 0
         p, self._press = getattr(self, "_press", None), None
         if p and abs(ev.x_root - p[0]) + abs(ev.y_root - p[1]) < 5 and time.time() - p[2] < 0.5:
             self.sessions_menu(ev.x_root, ev.y_root)     # a click, not a drag
@@ -961,6 +975,23 @@ class Widget:
         if not self._drag:
             return
         self.root.geometry("+%d+%d" % (ev.x_root - self._dx, ev.y_root - self._dy))
+        now = time.time()
+        p = getattr(self, "_press", None)
+        if p and not self.held and abs(ev.x_root - p[0]) + abs(ev.y_root - p[1]) >= 6:
+            self.held = True                 # picked up
+        if self.held:
+            self.note_until, self.note_text, self.note_color = now + 0.4, tr("drag.held"), ORANGE
+        last = self._last_drag
+        self._last_drag = (ev.x_root, ev.y_root, now)
+        if last and now > last[2]:
+            dt = max(now - last[2], 0.008)
+            vx, vy = (ev.x_root - last[0]) / dt, (ev.y_root - last[1]) / dt
+            ox, oy = self._vel
+            self._vel = (ox * 0.6 + vx * 0.4, oy * 0.6 + vy * 0.4)
+            d = 1 if vy > 250 else (-1 if vy < -250 else 0)
+            if d and d != self._shake_dir:   # a change of direction: one shake
+                self._shake_dir = d
+                self._shakes = [t for t in self._shakes if now - t < 1.2] + [now]
 
     def popup(self, ev):
         if self.popup_menu:
@@ -1337,7 +1368,8 @@ class Widget:
             self.draw()
         except tk.TclError:
             return
-        busy = 0.0 < self.e < 1.0 or self.col_in or self.panel_in or self.target != self.e
+        busy = (0.0 < self.e < 1.0 or self.col_in or self.panel_in or self.target != self.e
+                or self.held or time.time() < max(self.dizzy_until, self.land_until))
         period = 1.0 / (FPS_FAST if busy else FPS)
         now = time.perf_counter()
         due = getattr(self, "_due", now) + period
@@ -1441,6 +1473,12 @@ class Widget:
             act = work
         if time.time() < self.alarm_until:      # a limit alert beats everything else
             act = "alarm"
+        if self.held:                           # …except being picked up
+            act = "held"
+        elif now < self.dizzy_until:
+            act = "dizzy"
+        elif now < self.land_until:
+            act = "land"
 
         dy = sx = sy = rot = 0.0
         glow = 0.6
@@ -1747,6 +1785,45 @@ class Widget:
             arm_l = -5 if math.sin(t * 8) > 0 else 1
             arm_r = 1 if math.sin(t * 8) > 0 else -5
             props.append("balls")
+        elif act == "held":                     # dangling from the mouse
+            vx, vy = self._vel
+            rot = max(-0.45, min(0.45, -vx / 2200))           # swings behind the movement
+            up = max(0.0, min(1.0, -vy / 1500))
+            down = max(0.0, min(1.0, vy / 1500))
+            sy, sx = 1 + 0.18 * up - 0.12 * down, 1 - 0.08 * up + 0.1 * down
+            arm_l = arm_r = -9 + math.sin(t * 16) * 2
+            step = int(t * 10) % 2                            # little legs kicking
+            eye = "happy" if up > 0.3 else ("scared" if down > 0.3 or abs(vx) > 1200 else "open")
+            eye_dx, eye_dy = max(-2, min(2, vx / 600)), max(-2, min(2, vy / 600))
+            dy = -4 + math.sin(t * 6) * 1.5
+            if (abs(vx) + abs(vy) > 1200) and self.emit <= 0:
+                self.spawn("drop", cx + self.pos + random.choice((-1, 1)) * (SW / 2 - 4), by - SH + 8,
+                           -vx / 60, -vy / 60 - 10, 0.6)
+                self.emit = 0.12
+        elif act == "dizzy":                    # shaken too hard: stars around the head
+            left = self.dizzy_until - now
+            rot = math.sin(t * 5) * 0.18
+            self.pos += math.sin(t * 5) * 0.6
+            eye = "x" if left > 1.0 else "closed"
+            arm_l, arm_r = math.sin(t * 5) * 4, -math.sin(t * 5) * 4
+            if self.emit <= 0:
+                a = t * 7
+                # a halo above the head (and the hat); particles get pulled toward the
+                # center by PART_REACH, so the offsets are spread out to make up for it
+                lift = (min(HAT_TOP.get(self.costume(), -27), -27) - 10) / PART_REACH
+                self.spawn("star", cx + self.pos + math.cos(a) * 24 / PART_REACH,
+                           by - SH / 2 + lift + math.sin(a) * 4 / PART_REACH,
+                           0, 0, 0.25, col=(1.0, 0.85, 0.3))
+                self.emit = 0.06
+        elif act == "land":                     # put down: squash and bounce
+            q = 1 - (self.land_until - now) / 0.6
+            bump = math.sin(min(q, 1.0) * math.pi)
+            sy, sx = 1 - 0.22 * bump * (1 - q), 1 + 0.16 * bump * (1 - q)
+            eye = "happy"
+            if q < 0.08 and self.emit <= 0:
+                for i in (-1, 1):
+                    self.spawn("dust", cx + self.pos + i * SW / 2, by, i * 30, -8, 0.5)
+                self.emit = 0.3
         elif act == "error":
             eye = "x"
             self.pos += math.sin(t * 50) * 1.2
@@ -2337,7 +2414,7 @@ class Widget:
             rows = [(n, p * q, r) for n, p, r in rows]
         near = bool(self.mouse and self.on_plus(*self.mouse))
         key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, st.error, self.setup_phase,
-               time.time() < self.alarm_until, time.time() < self.note_until,
+               time.time() < self.alarm_until, time.time() < self.note_until and self.note_text,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
         if key != self._skey:               # rebuild the static layer only when something changed
             self._skey = key

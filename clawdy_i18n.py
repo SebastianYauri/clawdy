@@ -99,6 +99,8 @@ STRINGS = {
     "task.ask_title": ("Claude needs you", "Claude te necesita"),
     "task.permission": ("{where} · waiting for your permission", "{where} · espera tu permiso"),
     "task.ask_short": ("Needs you!", "¡Te necesita!"),
+    "drag.held": ("Wheee!", "¡Wiii!"),
+    "drag.dizzy": ("So dizzy…", "Mareado…"),
     "share.title": ("My Claude usage", "Mi uso de Claude"),
     "share.footer": ("Get it on {link}", "Descárgalo en {link}"),
     "share.no_data": ("no usage yet", "aún sin datos"),
