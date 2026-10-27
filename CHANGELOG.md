@@ -8,6 +8,8 @@ All notable changes to Clawdy are listed here. Versions follow
 - Alerts near your limits: when any limit crosses 80 % or 95 %, Clawdy raises
   the alarm and you get a system notification, once per reset window. Turn it
   off from the right-click menu.
+- 8-bit alert sound (bip-bip-biiip) with the alerts; mute it with **Sounds**
+  in the menu.
 
 ## 1.3.1
 

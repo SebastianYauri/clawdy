@@ -87,6 +87,7 @@ STRINGS = {
     "menu.pin": ("Keep panel open", "Panel siempre abierto"),
     "menu.walks": ("Walks around the desktop", "Paseos por el escritorio"),
     "menu.alerts": ("Alert near limits", "Avisar cerca del límite"),
+    "menu.sounds": ("Sounds", "Sonidos"),
     "alert.title": ("{name} at {p}%", "{name} al {p} %"),
     "alert.body": ("Claude usage · resets in {t}", "Uso de Claude · se reinicia en {t}"),
     "alert.body_nr": ("Claude usage", "Uso de Claude"),

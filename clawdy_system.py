@@ -550,6 +550,26 @@ def focus_session(pid):
     return False
 
 
+def play_sound(name):
+    """Play assets/<name>.wav without blocking. Best effort; never raises."""
+    path = resource("assets", name + ".wav")
+    if not os.path.exists(path):
+        return False
+    try:
+        if WIN:
+            import winsound
+            winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            return True
+        players = [["afplay", path]] if MAC else [["pw-play", path], ["paplay", path], ["aplay", "-q", path]]
+        for cmd in players:
+            if shutil.which(cmd[0]):
+                subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return True
+    except Exception:
+        pass
+    return False
+
+
 def notify(title, body, tray=None):
     """A system notification. Best effort; never raises."""
     try:

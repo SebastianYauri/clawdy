@@ -61,7 +61,8 @@ def main():
     os.makedirs(os.path.join(DEST, "assets"), exist_ok=True)
     for f in FILES:
         shutil.copy2(os.path.join(SRC, f), os.path.join(DEST, f))
-    shutil.copy2(os.path.join(SRC, "assets", "icon.png"), os.path.join(DEST, "assets", "icon.png"))
+    for asset in ("icon.png", "alert.wav"):
+        shutil.copy2(os.path.join(SRC, "assets", asset), os.path.join(DEST, "assets", asset))
     add_to_menu(main_py)
     subprocess.Popen([sys.executable, main_py], start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -556,6 +556,7 @@ class Widget:
         self.hidden = False
         self.v_walks = tk.BooleanVar(value=cs.load_config().get("walks", True))
         self.v_alerts = tk.BooleanVar(value=cs.load_config().get("alerts", True))
+        self.v_sounds = tk.BooleanVar(value=cs.load_config().get("sounds", True))
         self._alerts = []                   # filled by the fetch thread, shown on the Tk thread
         self.alarm_until = 0.0
         self.walk, self.away = None, False
@@ -1110,11 +1111,18 @@ class Widget:
             name, p, reset = self._alerts.pop(0)
             body = tr("alert.body", t=until(reset)) if reset else tr("alert.body_nr")
             cs.notify(tr("alert.title", name=name, p=round(p)), body, self.tray)
+            if self.v_sounds.get():
+                cs.play_sound("alert")
             self.force, self.act_t = "alarm", 0.0
             self.alarm_until = time.time() + 4.0
 
     def toggle_alerts(self):
         cs.update_config(alerts=self.v_alerts.get())
+
+    def toggle_sounds(self):
+        cs.update_config(sounds=self.v_sounds.get())
+        if self.v_sounds.get():
+            cs.play_sound("alert")               # a preview
 
     def toggle_walks(self):
         cs.update_config(walks=self.v_walks.get())
@@ -2567,6 +2575,7 @@ class PopupMenu:
             ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
             ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
             ("toggle", tr("menu.alerts"), w.v_alerts, w.toggle_alerts),
+            ("toggle", tr("menu.sounds"), w.v_sounds, w.toggle_sounds),
             ("sep",),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in self.COSTUMES], lambda: w.costume_pref, w.set_costume, 3),
