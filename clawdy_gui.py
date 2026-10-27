@@ -38,7 +38,7 @@ SCENE_K = 0.62                      # …and scaled down by this
 RING_C = (52, 54)                   # ring center
 RING_RS = (48, 43, 38)              # nested, thin, close to the edge
 RING_W = 3.5
-HAT_TOP = {"witch": -56, "santa": -52, "pumpkin": -38}   # sprite units; the body spans -27..27
+HAT_TOP = {"witch": -56, "santa": -52, "pumpkin": -38, "frank": -37}   # sprite units; the body spans -27..27
 HOP = 0.42                          # lower jumps: Clawdy lives inside the rings
 REACH = 0.55                        # floating props are pulled closer…
 PART_REACH = 0.6                    # …and particles too, so they fit in the porthole
@@ -158,10 +158,11 @@ EYES = [(r, c) for r, row in enumerate(SPRITE) for c, ch in enumerate(row) if ch
 # idle routine, when Claude Code isn't doing anything
 ACTS = ["walk", "jump", "wave", "walk", "look", "spin", "dance", "special", "walk", "stretch", "flip"]
 
-SPOOKY = ("witch", "pumpkin", "ghost", "vampire")
+SPOOKY = ("witch", "pumpkin", "ghost", "vampire", "frank")
 # In costume the special move shows up more often, plus its own "trick"
 COSTUME_ACTS = ["walk", "special", "jump", "look", "trick", "special", "spin", "trick", "stretch", "flip"]
-TRICKS = {"witch": "fly", "vampire": "bat", "ghost": "float", "pumpkin": "roll", "santa": "present"}
+TRICKS = {"witch": "fly", "vampire": "bat", "ghost": "float", "pumpkin": "roll", "santa": "present",
+          "frank": "zombie"}
 # Claude Code work props, in costume
 THEMED = {("witch", "bubble"): "crystal", ("witch", "laptop"): "spellbook", ("witch", "book"): "spellbook",
           ("witch", "hammer"): "cauldron", ("santa", "laptop"): "gift"}
@@ -171,6 +172,7 @@ PALETTES = {
     "ghost": [(0.95, 0.95, 1.0), (0.72, 0.74, 0.85), (0.60, 0.85, 1.0)],
     "vampire": [(0.88, 0.14, 0.20), (0.62, 0.55, 0.72), (0.95, 0.95, 0.95)],
     "santa": [(0.90, 0.16, 0.16), (0.22, 0.72, 0.32), (1.0, 1.0, 1.0), (1.0, 0.85, 0.35)],
+    "frank": [(0.55, 0.85, 0.40), (0.70, 0.90, 1.0), (1.0, 0.95, 0.45)],
 }
 MAGIC = [(0.75, 0.45, 0.95), (1.0, 0.85, 0.35), (0.55, 0.85, 1.0)]
 
@@ -1722,6 +1724,16 @@ class Widget:
                     self.spawn("bat", cx + self.pos + d * 10, by - SH, d * 70, random.uniform(-40, -15), 1.6,
                                ph=random.uniform(0, 6))
                     self.emit = 0.35
+            elif c == "frank":                  # IT'S ALIVE: lightning through the bolts
+                q = (p * 2) % 1
+                eye = "scared" if q < 0.35 else "open"
+                self.pos += math.sin(t * 60) * (1.2 if q < 0.35 else 0)
+                arm_l = arm_r = -9 if q < 0.35 else -4
+                if q < 0.35 and self.emit <= 0:
+                    for d in (-1, 1):
+                        self.spawn("spark", cx + self.pos + d * (SW / 2 + 6), by - SH / 2 + 4,
+                                   d * random.uniform(20, 60), random.uniform(-60, -10), 0.5)
+                    self.emit = 0.08
             elif c == "santa":                  # ho ho ho!
                 q = (p * 3) % 1
                 dy = -math.sin(q * math.pi) * 22 * HOP
@@ -1766,6 +1778,16 @@ class Widget:
             dy = -7 - math.sin(ang * 2) * 6
             arm_l = arm_r = -4 + math.sin(t * 6) * 2
             eye = "happy"
+        elif act == "zombie":                    # Frankenstein: stiff stomp, arms out front
+            self.pos += self.dir * 14 * dt
+            if abs(self.pos) > lim * 0.8:
+                self.pos = math.copysign(lim * 0.8, self.pos)
+                self.dir *= -1
+            step = int(t * 3) % 2
+            rot = (0.08 if step else -0.08)
+            dy = -1.5 * step
+            arm_l = arm_r = -6
+            eye = "closed" if (t % 2.5) < 0.9 else "open"
         elif act == "roll":                      # pumpkin: rolls side to side
             q = math.sin(p * 2 * math.pi)
             self.pos = q * 12
@@ -2259,6 +2281,19 @@ class Widget:
                 b(12 + ex, -15, 7, h, dark)
                 if eye == "scared":
                     b(-4, 0, 8, 7, dark)                  # "boo" mouth
+        elif c == "frank":
+            hair, rim, metal, lit = (0.10, 0.09, 0.11), (0.42, 0.40, 0.45), (0.62, 0.64, 0.68), (0.85, 0.87, 0.90)
+            b(-32, -36, 64, 15, rim)                      # light rim so the flat top reads on dark
+            b(-30, -34, 60, 12, hair)                     # flat-top hair over the forehead
+            for x in (-26, -14, -2, 10, 22):              # jagged fringe
+                tri([(x, -22), (x + 6, -22), (x + 3, -17)], hair)
+            stitch = (0.45, 0.22, 0.20)
+            b(-26, 3, 14, 2, stitch)                      # stitches on the cheek
+            for x in (-24, -19, -14):
+                b(x, 1, 2, 6, stitch)
+            for d in (-1, 1):                             # neck bolts
+                b(d * 34 - (8 if d < 0 else 0), 2, 8, 6, metal)
+                b(d * 34 - (8 if d < 0 else 0) + (0 if d < 0 else 6), 1, 2, 8, lit)
         elif c == "vampire":
             hair = (0.12, 0.10, 0.14)                     # visible on orange
             b(-30, -27, 60, 5, hair)
@@ -2920,7 +2955,7 @@ class PopupMenu:
     pills instead of checkboxes and submenus."""
 
     MW, ROW, PAD = 236, 26, 10
-    COSTUMES = ("auto", "none", "witch", "pumpkin", "ghost", "vampire", "santa")
+    COSTUMES = ("auto", "none", "witch", "pumpkin", "ghost", "vampire", "frank", "santa")
 
     def __init__(self, w, x_root, y_root, items=None, width=None):
         self.w, self.k = w, w.k

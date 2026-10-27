@@ -5,6 +5,13 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.3
 
+- **New costume: Frankenstein.** Flat-top hair, stitches and neck bolts; it
+  stomps stiffly with its arms out, and its special move is a jolt of
+  lightning through the bolts.
+- **Desktop walks in costume.** The vampire flies off as a bat, the ghost floats
+  (half see-through) and says boo, the witch rides her broom, the pumpkin
+  bounces, Frankenstein climbs down to the bottom of the screen and stomps, and
+  Santa keeps his hat on.
 - **Pace.** The panel shows, for each limit, whether it lasts until it resets
   (*enough until reset*) or when it will fill at your pace of the last hour
   (*full in 1h 20m*). If one would fill within 45 minutes, before resetting, you

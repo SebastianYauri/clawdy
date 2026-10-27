@@ -177,8 +177,14 @@ you can bring it back, or quit, from that icon.
 
 The witch flies on her broom, reads a crystal ball while Claude thinks,
 writes in a spellbook and stirs a cauldron when commands run. The ghost floats
-and says boo, the pumpkin rolls and glows, the vampire turns into a bat and
-Santa pulls out presents.
+and says boo, the pumpkin rolls and glows, the vampire turns into a bat,
+Frankenstein stomps around with its arms out and gets jolted by lightning
+through its neck bolts, and Santa pulls out presents.
+
+Each costume also goes out on its desktop walks its own way: the vampire flies
+off as a bat, the ghost floats around and says boo, the witch rides her broom,
+the pumpkin bounces, Frankenstein climbs down to the bottom of the screen and
+stomps along it, and Santa keeps his hat on.
 
 ## Does it cost anything?
 

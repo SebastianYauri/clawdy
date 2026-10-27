@@ -149,6 +149,7 @@ STRINGS = {
     "costume.pumpkin": ("Pumpkin", "Calabaza"),
     "costume.ghost": ("Ghost", "Fantasma"),
     "costume.vampire": ("Vampire", "Vampiro"),
+    "costume.frank": ("Frankenstein", "Frankenstein"),
     "costume.santa": ("Santa", "Noel"),
 
     "welcome.title": ("Welcome to Clawdy", "Bienvenido a Clawdy"),
