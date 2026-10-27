@@ -33,11 +33,12 @@ jobs:
       - name: Package with PyInstaller
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyinstaller==6.16.0
+          python -m pip install pyinstaller==6.16.0 pystray==0.19.5 pillow
           pyinstaller --noconfirm --clean --windowed --name Clawdy `
             --icon assets\icon.ico --add-data "assets;assets" `
             --hidden-import clawdy_gui --hidden-import clawdy_hook --hidden-import clawdy_system `
             --hidden-import clawdy_update --hidden-import clawdy_version --hidden-import clawdy_i18n `
+            --hidden-import clawdy_tray --hidden-import pystray._win32 `
             clawdy.py
           Get-ChildItem dist\Clawdy | Select-Object Name, Length
 
@@ -271,12 +272,13 @@ jobs:
       - name: Package the app
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyinstaller==6.16.0 pillow
+          python -m pip install pyinstaller==6.16.0 pillow pystray==0.19.5
           pyinstaller --noconfirm --clean --windowed --name "Clawdy" \
             --icon assets/icon.png --osx-bundle-identifier com.clawdy.app \
             --add-data "assets:assets" \
             --hidden-import clawdy_gui --hidden-import clawdy_hook --hidden-import clawdy_system \
             --hidden-import clawdy_update --hidden-import clawdy_version --hidden-import clawdy_i18n \
+            --hidden-import clawdy_tray --hidden-import pystray._darwin \
             clawdy.py
           APP="dist/Clawdy.app"
           # a widget: no Dock icon

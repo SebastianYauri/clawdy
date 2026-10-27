@@ -16,6 +16,9 @@ All notable changes to Clawdy are listed here. Versions follow
   and refreshes the moment it does), retries within seconds when the network
   isn't up yet, and refreshes as soon as the computer wakes from sleep.
 - Limits that already reset show 0 % instead of yesterday's numbers.
+- Tray icon (menu bar on macOS) to show or hide Clawdy, open a new chat,
+  refresh, change settings and quit. Hidden, Clawdy keeps running in the
+  background.
 - New intro: until fresh usage arrives the widget stays empty with a quiet
   loading pulse. Then Clawdy walks in carrying a beach ball, throws it on the
   floor and the rings fill up from 0 as the numbers count up.

@@ -17,6 +17,7 @@ import clawdy_system as cs
 import clawdy_update as cu
 from clawdy_i18n import STRINGS, t as tr
 from clawdy_system import SESSIONS
+from clawdy_tray import Tray
 from clawdy_version import VERSION
 
 tk = None            # imported in run(): the hook doesn't need tkinter
@@ -545,6 +546,8 @@ class Widget:
         self.v_start = tk.BooleanVar(value=cs.autostart_enabled())
         self.v_pin = tk.BooleanVar(value=self.pinned)
         self.popup_menu = None
+        self.hidden = False
+        self.tray = Tray(self, cs.resource("assets", "icon.png")) if not demo else None
 
         self.fam = self.pick_font(["Segoe UI", "DejaVu Sans", "Helvetica Neue", "Helvetica"])
         self.mono = self.pick_font(["Consolas", "DejaVu Sans Mono", "Menlo", "Courier"])
@@ -951,8 +954,44 @@ class Widget:
                 self.refresh()
         self.root.after(2000, self.sync)
 
+    def visible(self):
+        return not self.hidden
+
+    def hide(self):
+        """Keep running in the background: still checks usage, draws nothing."""
+        if self.popup_menu:
+            self.popup_menu.close()
+        self.hidden = True
+        self.panel.withdraw()
+        self.root.withdraw()
+        if self.tray:
+            self.tray.refresh()
+
+    def show(self):
+        if not self.hidden:
+            return
+        self.hidden = False
+        self.root.deiconify()
+        self.panel.deiconify()
+        self._ppos = self._palpha = None
+        self._skey = self._pkey = None
+        self.root.lift()
+        if self.tray:
+            self.tray.refresh()
+
+    def toggle_visible(self):
+        self.hide() if not self.hidden else self.show()
+
+    def flip(self, var, apply):
+        """Toggle a menu setting from outside the right-click menu (the tray)."""
+        var.set(not var.get())
+        apply()
+        if self.tray:
+            self.tray.refresh()
+
     def greet(self):
         """The program was opened again: wave so the user finds us."""
+        self.show()
         self.root.deiconify()
         self.root.lift()
         self.pos, self.emit = 0.0, 0.0
@@ -962,6 +1001,9 @@ class Widget:
     def tick(self):
         if self.upd_quit:
             self.root.destroy()
+            return
+        if self.hidden:                     # in the tray: nothing to draw
+            self.root.after(500, self.tick)
             return
         try:
             if not self._placed:
@@ -2311,6 +2353,8 @@ class PopupMenu:
             ("sep",),
             ("action", tr("menu.quit"), w.root.destroy, "danger"),
         ]
+        if w.tray and w.tray.active:
+            self.items.insert(-1, ("action", tr("menu.hide"), w.hide))
         self.layout()
         k = self.k
         self.win = tk.Toplevel(w.root)
@@ -2667,4 +2711,6 @@ def run(demo=False, selftest=0):
     else:
         app["welcome"] = Welcome(root, on_done=start)
     root.mainloop()
+    if app["widget"] and app["widget"].tray:
+        app["widget"].tray.stop()
     return 0

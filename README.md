@@ -89,6 +89,7 @@ clone the repo and run `python3 install.py`. See [Building](docs/building.md).
 | Click **+** | Start a new Claude chat |
 | Drag | Move Clawdy anywhere |
 | Right-click | Open the menu |
+| Tray / menu bar icon | Show or hide Clawdy, new chat, refresh, settings, quit |
 
 <p align="center">
   <img src="docs/media/menu.png" alt="The right-click menu" width="300">
@@ -97,6 +98,10 @@ clone the repo and run `python3 install.py`. See [Building](docs/building.md).
 From the menu you can refresh usage, check for updates, change the size
 (small, normal, large), pick a costume, keep the panel always open, and turn
 *React to Claude Code* and *Open at login* on or off.
+
+Clawdy also has an icon in the system tray (the menu bar on macOS). Choose
+**Hide (keep in tray)** to tuck it away: it keeps running in the background and
+you can bring it back, or quit, from that icon.
 
 ### Costumes
 

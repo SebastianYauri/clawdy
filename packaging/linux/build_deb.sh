@@ -15,7 +15,7 @@ install -d "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/usr/lib/clawdy/assets" \
 
 install -m 644 "$ROOT"/clawdy.py "$ROOT"/clawdy_gui.py "$ROOT"/clawdy_hook.py \
                "$ROOT"/clawdy_system.py "$ROOT"/clawdy_update.py "$ROOT"/clawdy_version.py \
-               "$ROOT"/clawdy_i18n.py \
+               "$ROOT"/clawdy_i18n.py "$ROOT"/clawdy_tray.py \
                "$PKG/usr/lib/clawdy/"
 install -m 644 "$ROOT/assets/icon.png" "$PKG/usr/lib/clawdy/assets/icon.png"
 install -m 644 "$ROOT/assets/icon.png" "$PKG/usr/share/icons/hicolor/256x256/apps/clawdy.png"
@@ -50,6 +50,7 @@ Section: utils
 Priority: optional
 Architecture: all
 Depends: python3 (>= 3.8), python3-tk
+Recommends: python3-pystray, gir1.2-ayatanaappindicator3-0.1
 Installed-Size: $SIZE
 Maintainer: SebastianYauri <77989694+SebastianYauri@users.noreply.github.com>
 Homepage: https://github.com/SebastianYauri/clawdy

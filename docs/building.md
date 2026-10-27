@@ -1,6 +1,9 @@
 # Building and running from source
 
-Clawdy is plain Python 3.8+ with tkinter and no other dependencies.
+Clawdy is plain Python 3.8+ with tkinter. The tray icon optionally uses
+[pystray](https://github.com/moses-palmer/pystray) and Pillow; without them Clawdy
+runs the same, just without a tray icon. On Ubuntu:
+`sudo apt install python3-pystray gir1.2-ayatanaappindicator3-0.1`.
 
 ## Run from a checkout
 
@@ -53,6 +56,7 @@ clawdy.py --hook        called by Claude Code on every event
 | `clawdy_system.py` | paths, settings, hooks, start at login, session token, single instance |
 | `clawdy_update.py` | update checks and installers |
 | `clawdy_i18n.py` | English and Spanish text |
+| `clawdy_tray.py` | tray / menu bar icon |
 | `clawdy_version.py` | version number, replaced by CI from the git tag |
 | `packaging/` | `.deb` script, Inno Setup script, CI hook test |
 
@@ -71,23 +75,23 @@ packaging/linux/build_deb.sh 1.2.3 dist
 ### Windows
 
 ```powershell
-pip install pyinstaller
+pip install pyinstaller pystray pillow
 pyinstaller --noconfirm --windowed --name Clawdy --icon assets\icon.ico `
   --add-data "assets;assets" --hidden-import clawdy_gui --hidden-import clawdy_hook `
   --hidden-import clawdy_system --hidden-import clawdy_update --hidden-import clawdy_version `
-  --hidden-import clawdy_i18n clawdy.py
+  --hidden-import clawdy_i18n --hidden-import clawdy_tray --hidden-import pystray._win32 clawdy.py
 iscc /DAppVersion=1.2.3 packaging\windows\Clawdy.iss
 ```
 
 ### macOS
 
 ```sh
-pip install pyinstaller pillow
+pip install pyinstaller pillow pystray
 pyinstaller --noconfirm --windowed --name Clawdy --icon assets/icon.png \
   --osx-bundle-identifier com.clawdy.app --add-data "assets:assets" \
   --hidden-import clawdy_gui --hidden-import clawdy_hook --hidden-import clawdy_system \
   --hidden-import clawdy_update --hidden-import clawdy_version --hidden-import clawdy_i18n \
-  clawdy.py
+  --hidden-import clawdy_tray --hidden-import pystray._darwin clawdy.py
 codesign --force --deep -s - dist/Clawdy.app
 ```
 

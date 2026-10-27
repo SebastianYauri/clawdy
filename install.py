@@ -15,7 +15,7 @@ import sys
 SRC = os.path.dirname(os.path.abspath(__file__))
 DEST = os.path.join(os.path.expanduser("~"), ".clawdy")
 FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
-         "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py"]
+         "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py"]
 
 
 def main():
