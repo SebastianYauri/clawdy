@@ -18,8 +18,7 @@ All notable changes to Clawdy are listed here. Versions follow
   sound and a line under Clawdy (**Done!** / **Needs you!**). Turn it off with
   **Notify when Claude is done**.
 - **Share my usage.** A new menu item (also in the tray) saves a pixel-art card
-  with Clawdy and your limits to your Pictures folder, shows it in your file
-  manager and opens a new post on X with the text filled in.
+  with Clawdy and your limits to your Pictures folder and opens it.
 - The tray / menu bar icon shows the version and has **Settings…**, which opens
   Clawdy's own menu window with every option.
 - **Install with one command:** `irm …/get.ps1 | iex` on Windows,

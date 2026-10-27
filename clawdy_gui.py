@@ -1168,7 +1168,7 @@ class Widget:
         cs.update_config(alerts=self.v_alerts.get())
 
     def share(self):
-        """Save a picture of Clawdy with your usage and open a new post on X."""
+        """Save a picture of Clawdy with your usage (in Pictures) and open it."""
         rows = bars(self.st.data) if self.st.data else []
         if not rows:
             self.flash(tr("share.no_data"))
@@ -1183,8 +1183,7 @@ class Widget:
                 return
 
             def done():
-                clawdy_share.reveal(path)
-                clawdy_share.open_post(tr("share.post", link="https://" + clawdy_share.LINK))
+                clawdy_share.show(path)
                 self.flash(tr("share.saved"), 8)
             self.root.after(0, done)
         threading.Thread(target=work, daemon=True).start()

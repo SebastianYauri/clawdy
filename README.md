@@ -47,7 +47,8 @@ juggles subagents… and throws confetti when the job is done.
   to ask your permission, you get a notification and a little 8-bit
   sound, and Clawdy tells you which project it was.
 - **Share your usage.** Right-click → **Share my usage** saves a pixel-art card
-  with Clawdy and your limits and opens a new post on X, ready for the image.
+  with Clawdy and your limits to your Pictures folder and opens it, ready to
+  post wherever you like.
 
   <p align="center"><img src="docs/media/share-card.png" alt="The share card: Clawdy in its rings and every limit with its percentage" width="600"></p>
 

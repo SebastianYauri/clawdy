@@ -104,8 +104,6 @@ STRINGS = {
     "share.no_data": ("no usage yet", "aún sin datos"),
     "share.saved": ("image saved ✓", "imagen guardada ✓"),
     "share.failed": ("could not save it", "no se pudo guardar"),
-    "share.post": ("My Claude usage today, tracked by Clawdy 👾 a pixel buddy for your desktop. Free & open source: {link} #ClaudeCode",
-                   "Mi uso de Claude hoy, con Clawdy 👾 un compañero pixel para tu escritorio. Gratis y open source: {link} #ClaudeCode"),
     "alert.title": ("{name} at {p}%", "{name} al {p} %"),
     "alert.body": ("Claude usage · resets in {t}", "Uso de Claude · se reinicia en {t}"),
     "alert.body_nr": ("Claude usage", "Uso de Claude"),

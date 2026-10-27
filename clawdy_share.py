@@ -1,4 +1,4 @@
-"""Share card: a pixel-art image of Clawdy with your usage, ready to post.
+"""Share card: a pixel-art image of Clawdy with your usage, to post wherever you like.
 
 Pure Python (zlib + struct), so it needs no image library. Everything is drawn
 on a grid of square cells, like the mascot itself.
@@ -10,9 +10,7 @@ import struct
 import subprocess
 import sys
 import unicodedata
-import webbrowser
 import zlib
-from urllib.parse import quote
 
 W, H = 1200, 630
 BG = (28, 25, 23)
@@ -221,20 +219,16 @@ def save_card(png, folder=None):
     return path
 
 
-def reveal(path):
-    """Show the file in the file manager, so it can be dragged into a post."""
+def show(path):
+    """Open the image in the system's viewer (Photos, Preview, the image viewer on Linux)."""
     try:
         if sys.platform == "win32":
-            subprocess.Popen(["explorer", "/select,", path])
+            os.startfile(path)
         elif sys.platform == "darwin":
-            subprocess.Popen(["open", "-R", path])
+            subprocess.Popen(["open", path])
         else:
             subprocess.Popen(["xdg-open", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              start_new_session=True)
+        return True
     except Exception:
-        pass
-
-
-def open_post(text):
-    """A new post on X with the text filled in; the user attaches the image."""
-    webbrowser.open("https://x.com/intent/post?text=" + quote(text))
+        return False

@@ -121,6 +121,17 @@ jobs:
           }
           Stop-Process $proc
 
+      - name: "Test: share card opens in the image viewer"
+        run: |
+          python -c "import os, clawdy_share as s; p = s.save_card(s.make_card([('Session (5h)', 42, (0.45, 0.78, 0.45), 'resets in 2h'), ('Weekly', 76, (0.95, 0.7, 0.25), 'resets in 3d')], 'My Claude usage', 'Get it on ' + s.LINK), folder=os.environ['RUNNER_TEMP']); print(p, os.path.getsize(p)); assert os.path.getsize(p) > 5000; assert s.show(p), 'could not open it'"
+          Start-Sleep 6
+          Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object ProcessName, MainWindowTitle | Format-Table -AutoSize
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+          [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+          $bmp.Save("$env:RUNNER_TEMP\win-share.png")
+
       - name: Build the installer
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
@@ -260,6 +271,16 @@ jobs:
           echo "auto-update OK: new files and reopened exactly once"
           python3 "$HOME/.clawdy/clawdy.py" --quit
 
+      - name: "Test: share card opens in the image viewer"
+        run: |
+          sudo apt-get install -y -qq eog xdg-utils imagemagick >/dev/null
+          xdg-mime default org.gnome.eog.desktop image/png
+          xvfb-run -a -s "-screen 0 1280x720x24" sh -c '
+            python3 -c "import os, clawdy_share as s; p = s.save_card(s.make_card([(\"Session (5h)\", 42, (0.45, 0.78, 0.45), \"resets in 2h\")], \"My Claude usage\", \"Get it on \" + s.LINK), folder=os.environ[\"RUNNER_TEMP\"]); print(p); assert os.path.getsize(p) > 5000; assert s.show(p)"
+            sleep 8
+            pgrep -a eog || { echo "the image viewer did not open"; exit 1; }
+            import -window root "$RUNNER_TEMP/linux-share.png"'
+
       - name: "Test: remove the package"
         run: |
           sudo apt-get remove -y -qq clawdy
@@ -270,6 +291,12 @@ jobs:
           name: linux
           path: dist/clawdy_*_all.deb
           if-no-files-found: error
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: screenshots-linux
+          path: ${{ runner.temp }}/linux-*.png
 
   macos:
     name: macOS (.dmg)
@@ -331,6 +358,13 @@ jobs:
           if ! kill -0 $PID; then echo "demo mode exited by itself"; exit 1; fi
           screencapture -x "$RUNNER_TEMP/mac-demo.png" || true
           kill $PID
+
+      - name: "Test: share card opens in the image viewer"
+        run: |
+          python3 -c "import os, clawdy_share as s; p = s.save_card(s.make_card([('Session (5h)', 42, (0.45, 0.78, 0.45), 'resets in 2h')], 'My Claude usage', 'Get it on ' + s.LINK), folder=os.environ['RUNNER_TEMP']); print(p); assert os.path.getsize(p) > 5000; assert s.show(p)"
+          sleep 6
+          pgrep -lf Preview || { echo "Preview did not open"; exit 1; }
+          screencapture -x "$RUNNER_TEMP/mac-share.png" || true
 
       - name: Build the .dmg and .zip
         run: |
