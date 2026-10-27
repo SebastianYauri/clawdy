@@ -74,6 +74,10 @@ The first time Clawdy opens it explains what it does and asks before connecting
 to Claude Code or starting at login.
 
 > [!NOTE]
+> **Edge blocks the download?** New apps aren't "commonly downloaded" yet. Open
+> the downloads list (**Ctrl + J**), point at `Clawdy-Setup.exe`, click **⋯** →
+> **Keep**, then **Show more** → **Keep anyway**.
+>
 > **Windows says "Windows protected your PC"?** That's normal for new apps
 > without a paid code-signing certificate. Click **More info** → **Run anyway**.
 > It only happens once.

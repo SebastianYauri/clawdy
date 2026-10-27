@@ -9,6 +9,9 @@
 You need [Claude Code](https://claude.com/claude-code) installed and signed in.
 Already have Clawdy? It updates itself.
 
+**Edge blocks the download?** Press **Ctrl + J**, click **⋯** next to `Clawdy-Setup.exe` → **Keep**,
+then **Show more** → **Keep anyway**. New apps aren't "commonly downloaded" yet.
+
 **Windows says "Windows protected your PC"?** Click **More info** → **Run anyway**.
 That's normal for apps without a paid signing certificate, and only happens once.
 
