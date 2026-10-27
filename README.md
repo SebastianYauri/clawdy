@@ -160,7 +160,7 @@ Clawdy is open source and every installer is built from this repository by
 personal computer. Each release lists the SHA-256 of its files in
 `SHA256SUMS.txt` and links its VirusTotal report.
 
-For the current Windows installer, [VirusTotal](https://www.virustotal.com/gui/file/23abdbd627b6ba05a9a82c3468f7be545f578cf13e9fa4ac6b7518e009b093f1) shows Microsoft Defender,
+For the current Windows installer, [VirusTotal](https://www.virustotal.com/gui/file/c39a9db2a2dd19a5e772ab4da24872b9971e23c84a1c881d8f434726222c9512) shows Microsoft Defender,
 Kaspersky, ESET, Malwarebytes, McAfee, Sophos, Symantec, BitDefender and the
 other major engines finding nothing. A handful of machine-learning engines flag
 it generically: they do that with most apps packaged with PyInstaller, because
