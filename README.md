@@ -102,6 +102,10 @@ login.
 > **Always Allow**: that's your Claude Code session, which Clawdy needs to read
 > your usage. macOS may ask this again after an update.
 
+**Windows Package Manager:** `winget install SebastianYauri.Clawdy` is coming soon; the
+package is [in review](https://github.com/microsoft/winget-pkgs/pull/462441). Installing with
+winget skips the browser and SmartScreen warnings.
+
 **Other systems** (Intel Macs, Fedora, Arch…): with Python 3.8+ and tkinter,
 clone the repo and run `python3 install.py`. See [Building](docs/building.md).
 
