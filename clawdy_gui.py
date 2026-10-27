@@ -1184,10 +1184,13 @@ class Widget:
             done0, ask0 = prev.get(sid, (0, 0))
             where = os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else "Claude Code"
             ask, done = s.get("ask", 0), s.get("done", 0)
-            if ask > ask0 and ask > done and ask - self._asked.get(sid, 0) > ASK_GAP:
+            # only a permission prompt stops a task halfway; "waiting for your reply"
+            # comes after it already finished, which the "done" notice covers
+            if (ask > ask0 and ask > done and s.get("ask_kind") == "permission"
+                    and ask - self._asked.get(sid, 0) > ASK_GAP):
                 self._asked[sid] = ask
-                why = "task.permission" if s.get("ask_kind") == "permission" else "task.waiting"
-                self.announce(tr("task.ask_title"), tr(why, where=where), "ask", tr("task.ask_short"), ORANGE)
+                self.announce(tr("task.ask_title"), tr("task.permission", where=where), "ask",
+                              tr("task.ask_short"), ORANGE)
             elif done > done0 and s.get("took", 0) >= self.done_after:
                 self.announce(tr("task.done_title"), tr("task.done_body", where=where, t=duration(s["took"])),
                               "done", tr("task.done_short"), (0.45, 0.78, 0.45))

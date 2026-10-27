@@ -98,7 +98,6 @@ STRINGS = {
     "task.done_short": ("Done!", "¡Listo!"),
     "task.ask_title": ("✋ Claude needs you", "✋ Claude te necesita"),
     "task.permission": ("{where} · waiting for your permission", "{where} · espera tu permiso"),
-    "task.waiting": ("{where} · waiting for your reply", "{where} · espera tu respuesta"),
     "task.ask_short": ("Needs you!", "¡Te necesita!"),
     "share.title": ("My Claude usage", "Mi uso de Claude"),
     "share.no_data": ("no usage yet", "aún sin datos"),
