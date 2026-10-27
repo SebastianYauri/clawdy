@@ -3,6 +3,22 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.1
+
+- **"Claude finished" / "Claude needs you" notifications.** When a Claude Code
+  task that took 30 seconds or more finishes, or Claude stops to wait for your
+  permission or reply, you get a notification with the project name, an 8-bit
+  sound and a line under Clawdy (**Done!** / **Needs you!**). Turn it off with
+  **Notify when Claude finishes**.
+- **Share my usage.** A new menu item (also in the tray) saves a pixel-art card
+  with Clawdy and your limits to your Pictures folder, shows it in your file
+  manager and opens a new post on X with the text filled in.
+- **Install with one command:** `irm …/get.ps1 | iex` on Windows,
+  `curl -fsSL …/get.sh | sh` on macOS and Linux, plus a
+  [Scoop bucket](https://github.com/SebastianYauri/scoop-bucket) and a
+  [Homebrew tap](https://github.com/SebastianYauri/homebrew-tap). Copies
+  installed with Scoop leave updates to `scoop update clawdy`.
+
 ## 1.4.0
 
 - Alerts near your limits: when any limit crosses 80 % or 95 %, Clawdy raises

@@ -1,4 +1,11 @@
-## Download
+## Install with one command
+
+- **Windows** (PowerShell): `irm https://raw.githubusercontent.com/SebastianYauri/clawdy/main/get.ps1 | iex`
+- **macOS / Linux**: `curl -fsSL https://raw.githubusercontent.com/SebastianYauri/clawdy/main/get.sh | sh`
+- **Scoop**: `scoop bucket add sebastianyauri https://github.com/SebastianYauri/scoop-bucket` then `scoop install clawdy`
+- **Homebrew**: `brew install --cask sebastianyauri/tap/clawdy`
+
+## Or download the installer
 
 | Your computer | File | How to install |
 |---|---|---|
@@ -6,8 +13,8 @@
 | **Ubuntu, Debian, Mint** | `clawdy_…_all.deb` | Double-click it → **Install**. |
 | **Mac (Apple silicon)** | `Clawdy-mac.dmg` | Open it and drag *Clawdy* into *Applications*. |
 
-You need [Claude Code](https://claude.com/claude-code) installed and signed in.
-Already have Clawdy? It updates itself.
+Clawdy reads your usage from [Claude Code](https://claude.com/claude-code); with only the Claude
+desktop app, one click sets it up. Already have Clawdy? It updates itself.
 
 **Edge blocks the download?** Press **Ctrl + J**, click **⋯** next to `Clawdy-Setup.exe` → **Keep**,
 then **Show more** → **Keep anyway**. New apps aren't "commonly downloaded" yet.

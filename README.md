@@ -41,6 +41,15 @@ juggles subagents… and throws confetti when the job is done.
   Christmas.
 - **Alerts near your limits.** At 80 % and 95 % of any limit Clawdy raises the
   alarm and sends a system notification, once per reset window.
+- **"Claude finished" and "Claude needs you".** Started a long task and switched
+  to another window? When Claude Code finishes (tasks over 30 seconds) or stops to
+  wait for your permission or reply, you get a notification and a little 8-bit
+  sound, and Clawdy tells you which project it was.
+- **Share your usage.** Right-click → **Share my usage** saves a pixel-art card
+  with Clawdy and your limits and opens a new post on X, ready for the image.
+
+  <p align="center"><img src="docs/media/share-card.png" alt="The share card: Clawdy in its rings and every limit with its percentage" width="600"></p>
+
 - **Desktop walks.** While you're using Claude, now and then Clawdy leaves its
   porthole: on Windows it rappels down to the taskbar, strolls along it and
   climbs back up a rope; on Linux and macOS it hangs from the top of the screen,
@@ -61,6 +70,24 @@ juggles subagents… and throws confetti when the job is done.
 </p>
 
 ## Download
+
+### One command
+
+Paste one line in a terminal and Clawdy installs and opens. No browser
+downloads, so no SmartScreen or Gatekeeper warnings either.
+
+| Your computer | Command |
+|---|---|
+| **Windows** (PowerShell) | `irm https://raw.githubusercontent.com/SebastianYauri/clawdy/main/get.ps1 \| iex` |
+| **macOS / Linux** (Terminal) | `curl -fsSL https://raw.githubusercontent.com/SebastianYauri/clawdy/main/get.sh \| sh` |
+| **Windows** ([Scoop](https://scoop.sh)) | `scoop bucket add sebastianyauri https://github.com/SebastianYauri/scoop-bucket`<br>`scoop install clawdy` |
+| **Mac** ([Homebrew](https://brew.sh)) | `brew install --cask sebastianyauri/tap/clawdy` |
+
+The scripts are short and readable: [get.ps1](get.ps1), [get.sh](get.sh). On
+Ubuntu/Debian `get.sh` installs the `.deb` (it asks for your password); on Intel
+Macs, Fedora, Arch and others it installs from source with Python.
+
+### Or download the installer
 
 Get the file for your computer from the
 **[latest release](https://github.com/SebastianYauri/clawdy/releases/latest)**:
@@ -106,8 +133,9 @@ login.
 package is [in review](https://github.com/microsoft/winget-pkgs/pull/462441). Installing with
 winget skips the browser and SmartScreen warnings.
 
-**Other systems** (Intel Macs, Fedora, Arch…): with Python 3.8+ and tkinter,
-clone the repo and run `python3 install.py`. See [Building](docs/building.md).
+**Other systems** (Intel Macs, Fedora, Arch…): use `get.sh` above, or with
+Python 3.8+ and tkinter clone the repo and run `python3 install.py`. See
+[Building](docs/building.md).
 
 ## Using it
 
@@ -124,7 +152,7 @@ clone the repo and run `python3 install.py`. See [Building](docs/building.md).
   <img src="docs/media/menu.png" alt="The right-click menu" width="300">
 </p>
 
-From the menu you can refresh usage, check for updates, change the size
+From the menu you can share your usage, refresh it, check for updates, change the size
 (small, normal, large), pick a costume, keep the panel always open, and turn
 *React to Claude Code* and *Open at login* on or off.
 
@@ -167,7 +195,8 @@ You can also skip the installer entirely: `python3 install.py` runs Clawdy strai
 
 ## Updates
 
-- **Windows and macOS** update silently and reopen.
+- **Windows and macOS** update silently and reopen. Installed with Scoop? Run
+  `scoop update clawdy`.
 - **Ubuntu/Debian** shows *"click to update"*; the system then asks for your
   password, like any package install.
 - Right-click → **Check for updates** to look right away.

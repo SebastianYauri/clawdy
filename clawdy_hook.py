@@ -83,10 +83,22 @@ def handle(data):
         s["subagents"] = max(0, s.get("subagents", 0) - 1)
     elif ev in ("Stop", "UserPromptSubmit", "SessionStart"):
         s["subagents"] = 0
+    now = time.time()
+    if ev == "UserPromptSubmit":
+        s["started"] = now
+    elif ev == "Stop":                          # a task finished: Clawdy may announce it
+        s["done"] = now
+        s["took"] = round(now - s.get("started", now))
+    elif ev in ("Notification", "PermissionRequest"):   # Claude is waiting for you
+        text = " ".join(str(data.get(k) or "") for k in ("message", "notification_type")).lower()
+        kind = "permission" if ev == "PermissionRequest" or "permission" in text else "waiting"
+        if not (kind == "waiting" and s.get("ask_kind") == "permission" and now - s.get("ask", 0) < 10):
+            s["ask_kind"] = kind                # both events can come for one request
+        s["ask"] = now
     new = state_for(ev, tool)
     if new:
         s["state"] = new
-    s["ts"] = time.time()
+    s["ts"] = now
     if data.get("cwd"):
         s["cwd"] = str(data["cwd"])[:400]       # shown in the sessions list
     s["pid"] = os.getppid()                     # Claude Code (or its shell): to find its window

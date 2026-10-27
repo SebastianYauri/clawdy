@@ -54,6 +54,7 @@ class Tray:
             Item(lambda item: tr("tray.hide") if w.visible() else tr("tray.show"),
                  call(w.toggle_visible), default=True),
             Item(tr("menu.chat_app" if w.has_app else "menu.chat_web"), call(w.new_chat)),
+            Item(tr("menu.share"), call(w.share)),
             Item(tr("menu.refresh"), call(w.refresh)),
             P.Menu.SEPARATOR,
             Item(tr("menu.hooks"), call(lambda: w.flip(w.v_hooks, w.toggle_hooks)),

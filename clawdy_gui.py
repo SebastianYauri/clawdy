@@ -20,6 +20,7 @@ from clawdy_system import SESSIONS
 from clawdy_tray import Tray
 from clawdy_walk import Walk
 import clawdy_sessions as sessions
+import clawdy_share
 from clawdy_version import VERSION
 
 tk = None            # imported in run(): the hook doesn't need tkinter
@@ -51,6 +52,8 @@ NAP_AFTER = 15 * 60                # no Claude Code activity for this long: take
 TRIP_EVERY = (10 * 60, 20 * 60)    # while you use Claude, now and then Clawdy goes for a walk
 IN_USE_FOR = 10 * 60               # Claude Code activity this recent counts as "using Claude"
 ALERT_AT = (80, 95)                 # percent: Clawdy raises the alarm (once per reset window)
+DONE_MIN = 30                       # tasks shorter than this finish without a notification
+ASK_GAP = 20                        # one "Claude needs you" per session within this many seconds
 # Intro once fresh usage arrives: walk in carrying a ball, throw it down, rings fill up.
 INTRO_WALK, INTRO_WIND, INTRO_FILL, INTRO_END = 1.4, 0.35, 0.9, 4.2
 PLUS = (93, 11)                     # new chat button, in the free corner
@@ -332,6 +335,12 @@ def until(iso):
     return "%dd %dh" % (d, h) if d else ("%dh %dm" % (h, m) if h else "%dm" % m)
 
 
+def duration(secs):
+    m, s = divmod(int(secs), 60)
+    h, m = divmod(m, 60)
+    return "%dh %dm" % (h, m) if h else ("%dm %ds" % (m, s) if m else "%ds" % s)
+
+
 ORDER = {"session": 0, "weekly_all": 1, "weekly_scoped": 2, "spend": 3}
 
 
@@ -559,6 +568,9 @@ class Widget:
         self.v_sounds = tk.BooleanVar(value=cs.load_config().get("sounds", True))
         self._alerts = []                   # filled by the fetch thread, shown on the Tk thread
         self.alarm_until, self.alarm_text = 0.0, ""
+        self.v_tasks = tk.BooleanVar(value=cs.load_config().get("tasks", True))
+        self._marks, self._asked = None, {}
+        self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.walk, self.away = None, False
         self.setup_phase = None              # installing Claude Code / waiting for the browser
         soon = os.environ.get("CLAWDY_WALK_IN")
@@ -1120,6 +1132,67 @@ class Widget:
     def toggle_alerts(self):
         cs.update_config(alerts=self.v_alerts.get())
 
+    def share(self):
+        """Save a picture of Clawdy with your usage and open a new post on X."""
+        rows = bars(self.st.data) if self.st.data else []
+        if not rows:
+            self.flash(tr("share.no_data"))
+            return
+        rows = [(n, p, bar_color(p), tr("time.resets_in", t=until(r)) if r else "") for n, p, r in rows]
+
+        def work():
+            try:
+                path = clawdy_share.save_card(clawdy_share.make_card(rows, tr("share.title")))
+            except Exception as e:
+                self.root.after(0, lambda: self.flash(tr("share.failed", e=str(e)[:40])))
+                return
+
+            def done():
+                clawdy_share.reveal(path)
+                clawdy_share.open_post(tr("share.post", link="https://" + clawdy_share.LINK))
+                self.flash(tr("share.saved"), 8)
+            self.root.after(0, done)
+        threading.Thread(target=work, daemon=True).start()
+
+    def toggle_tasks(self):
+        cs.update_config(tasks=self.v_tasks.get())
+
+    def check_tasks(self):
+        """Announce tasks that finished and Claude waiting for you, once each,
+        from the marks the hook leaves in each session's state file."""
+        found = {}
+        try:
+            names = os.listdir(SESSIONS)
+        except OSError:
+            names = []
+        for name in names:
+            if name.endswith(".json"):
+                try:
+                    found[name[:-5]] = json.load(open(os.path.join(SESSIONS, name)))
+                except Exception:
+                    pass
+        first, prev = self._marks is None, self._marks or {}
+        self._marks = {sid: (s.get("done", 0), s.get("ask", 0)) for sid, s in found.items()}
+        if first or self.demo or not self.v_tasks.get():
+            return                              # at start-up, only remember what was already there
+        for sid, s in found.items():
+            done0, ask0 = prev.get(sid, (0, 0))
+            where = os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else "Claude Code"
+            ask, done = s.get("ask", 0), s.get("done", 0)
+            if ask > ask0 and ask > done and ask - self._asked.get(sid, 0) > ASK_GAP:
+                self._asked[sid] = ask
+                why = "task.permission" if s.get("ask_kind") == "permission" else "task.waiting"
+                self.announce(tr("task.ask_title"), tr(why, where=where), "ask", tr("task.ask_short"), ORANGE)
+            elif done > done0 and s.get("took", 0) >= DONE_MIN:
+                self.announce(tr("task.done_title"), tr("task.done_body", where=where, t=duration(s["took"])),
+                              "done", tr("task.done_short"), (0.45, 0.78, 0.45))
+
+    def announce(self, title, body, sound, short, color):
+        cs.notify(title, body, self.tray)
+        if self.v_sounds.get():
+            cs.play_sound(sound)
+        self.note_until, self.note_text, self.note_color = time.time() + 6.0, short, color
+
     def toggle_sounds(self):
         cs.update_config(sounds=self.v_sounds.get())
         if self.v_sounds.get():
@@ -1133,6 +1206,7 @@ class Widget:
     def sync(self):
         """Runs every 2 s without touching the network unless a request is due."""
         self.maybe_walk()
+        self.check_tasks()
         if self._alerts and not self.hidden:
             self.show_alerts()
         if self.demo and not self.ready and time.time() - self.t0 > 1.5:
@@ -2222,7 +2296,7 @@ class Widget:
             rows = [(n, p * q, r) for n, p, r in rows]
         near = bool(self.mouse and self.on_plus(*self.mouse))
         key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, st.error, self.setup_phase,
-               time.time() < self.alarm_until,
+               time.time() < self.alarm_until, time.time() < self.note_until,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
         if key != self._skey:               # rebuild the static layer only when something changed
             self._skey = key
@@ -2382,6 +2456,8 @@ class Widget:
             self.text(mid, INFO_Y, upd[0], hx(upd[1]), 5, bold=True, anchor="center")
         elif time.time() < self.alarm_until:     # a limit alert is on
             self.text(mid, INFO_Y, self.alarm_text, hx((0.95, 0.40, 0.35)), 6, bold=True, anchor="center")
+        elif time.time() < self.note_until:      # a task finished, or Claude needs you
+            self.text(mid, INFO_Y, self.note_text, hx(self.note_color), 6, bold=True, anchor="center")
         elif self.work:
             self.text(mid, INFO_Y, label(self.work, short=True), hx(ORANGE), 6, bold=True, anchor="center")
         elif not rows and self.setup_phase:
@@ -2571,6 +2647,7 @@ class PopupMenu:
         self.items = items or [
             ("title", "Clawdy", "v" + VERSION),
             ("action", tr("menu.chat_app" if w.has_app else "menu.chat_web"), w.new_chat),
+            ("action", tr("menu.share"), w.share),
             ("action", tr("menu.refresh"), w.refresh),
             ("action", tr("menu.updates"), lambda: w.check_updates(True)),
             ("sep",),
@@ -2579,6 +2656,7 @@ class PopupMenu:
             ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
             ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
             ("toggle", tr("menu.alerts"), w.v_alerts, w.toggle_alerts),
+            ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
             ("toggle", tr("menu.sounds"), w.v_sounds, w.toggle_sounds),
             ("sep",),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),

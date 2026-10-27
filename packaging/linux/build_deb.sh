@@ -15,9 +15,10 @@ install -d "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/usr/lib/clawdy/assets" \
 
 install -m 644 "$ROOT"/clawdy.py "$ROOT"/clawdy_gui.py "$ROOT"/clawdy_hook.py \
                "$ROOT"/clawdy_system.py "$ROOT"/clawdy_update.py "$ROOT"/clawdy_version.py \
-               "$ROOT"/clawdy_i18n.py "$ROOT"/clawdy_tray.py "$ROOT"/clawdy_walk.py "$ROOT"/clawdy_sessions.py \
+               "$ROOT"/clawdy_i18n.py "$ROOT"/clawdy_tray.py "$ROOT"/clawdy_walk.py "$ROOT"/clawdy_sessions.py "$ROOT"/clawdy_share.py \
                "$PKG/usr/lib/clawdy/"
-install -m 644 "$ROOT/assets/icon.png" "$ROOT/assets/alert.wav" "$PKG/usr/lib/clawdy/assets/"
+install -m 644 "$ROOT/assets/icon.png" "$ROOT/assets/alert.wav" "$ROOT/assets/done.wav" "$ROOT/assets/ask.wav" \
+               "$PKG/usr/lib/clawdy/assets/"
 install -m 644 "$ROOT/assets/icon.png" "$PKG/usr/share/icons/hicolor/256x256/apps/clawdy.png"
 install -m 644 "$ROOT/LICENSE" "$PKG/usr/share/doc/clawdy/copyright"
 

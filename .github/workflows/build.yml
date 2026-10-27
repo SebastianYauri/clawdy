@@ -46,7 +46,7 @@ jobs:
             --icon assets\icon.ico --add-data "assets;assets" --version-file version_info.txt `
             --hidden-import clawdy_gui --hidden-import clawdy_hook --hidden-import clawdy_system `
             --hidden-import clawdy_update --hidden-import clawdy_version --hidden-import clawdy_i18n `
-            --hidden-import clawdy_tray --hidden-import clawdy_walk --hidden-import clawdy_sessions --hidden-import pystray._win32 `
+            --hidden-import clawdy_tray --hidden-import clawdy_walk --hidden-import clawdy_sessions --hidden-import clawdy_share --hidden-import pystray._win32 `
             clawdy.py
           Get-ChildItem dist\Clawdy | Select-Object Name, Length
           (Get-Item dist\Clawdy\Clawdy.exe).VersionInfo | Format-List ProductName, FileDescription, ProductVersion, FileVersion, CompanyName, LegalCopyright
@@ -296,7 +296,7 @@ jobs:
             --add-data "assets:assets" \
             --hidden-import clawdy_gui --hidden-import clawdy_hook --hidden-import clawdy_system \
             --hidden-import clawdy_update --hidden-import clawdy_version --hidden-import clawdy_i18n \
-            --hidden-import clawdy_tray --hidden-import clawdy_walk --hidden-import clawdy_sessions --hidden-import pystray._darwin \
+            --hidden-import clawdy_tray --hidden-import clawdy_walk --hidden-import clawdy_sessions --hidden-import clawdy_share --hidden-import pystray._darwin \
             clawdy.py
           APP="dist/Clawdy.app"
           # a widget: no Dock icon

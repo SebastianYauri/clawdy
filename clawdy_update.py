@@ -28,7 +28,7 @@ API = "https://api.github.com/repos/%s/releases/latest" % REPO
 RAW = "https://raw.githubusercontent.com/%s/%s/%s"
 SOURCE_FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
                 "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py", "clawdy_sessions.py",
-                "assets/icon.png", "assets/alert.wav"]
+                "clawdy_share.py", "assets/icon.png", "assets/alert.wav", "assets/done.wav", "assets/ask.wav"]
 RETRY_AFTER = 24 * 3600             # don't retry a failed version for a day
 
 
@@ -53,6 +53,8 @@ def mac_bundle():
 
 
 def install_kind():
+    if cs.FROZEN and cs.WIN and "\\scoop\\apps\\" in sys.executable.lower():
+        return "scoop"                  # Scoop owns the files: `scoop update clawdy`
     if cs.FROZEN and cs.WIN:
         return "exe"
     if cs.FROZEN and cs.MAC:
@@ -156,6 +158,9 @@ def apply(info):
     _remember_try(info)
     work = os.path.join(cs.cache_dir(), "update")
     os.makedirs(work, exist_ok=True)
+
+    if kind == "scoop":
+        return t("update.scoop")
 
     if kind == "exe":
         a = _asset(info, ".exe")

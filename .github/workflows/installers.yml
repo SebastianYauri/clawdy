@@ -1,0 +1,99 @@
+name: Test the install commands
+
+# Installs a published release the way users do: the one-line scripts,
+# Scoop and Homebrew. Run it by hand after a release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release to install (e.g. 1.4.1)"
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  CLAWDY_VERSION: ${{ inputs.version }}
+
+jobs:
+  linux-deb:
+    name: get.sh on Ubuntu (.deb)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: sh get.sh
+      - run: |
+          command -v clawdy
+          dpkg-query -W clawdy | grep -F "$CLAWDY_VERSION"
+          sudo apt-get remove -y -qq clawdy
+
+  linux-source:
+    name: get.sh on Fedora (from source)
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: dnf install -y -q python3 python3-tkinter curl tar
+      - run: sh get.sh
+      - run: |
+          test -f "$HOME/.clawdy/clawdy.py"
+          grep -F "$CLAWDY_VERSION" "$HOME/.clawdy/clawdy_version.py"
+
+  macos-script:
+    name: get.sh on macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: sh get.sh
+      - run: |
+          APP=/Applications/Clawdy.app
+          test -d "$APP"
+          defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString | grep -F "$CLAWDY_VERSION"
+          if xattr -p com.apple.quarantine "$APP" 2>/dev/null; then echo "quarantined"; exit 1; fi
+          pkill -f "Clawdy.app/Contents/MacOS" || true
+
+  macos-brew:
+    name: Homebrew on macOS
+    runs-on: macos-latest
+    steps:
+      - run: brew install --cask sebastianyauri/tap/clawdy
+      - run: |
+          test -d /Applications/Clawdy.app
+          brew list --cask --versions clawdy
+          brew uninstall --cask clawdy
+          test ! -d /Applications/Clawdy.app
+
+  windows-script:
+    name: get.ps1 on Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          $env:CLAWDY_NO_START = '1'
+          Invoke-Expression (Get-Content get.ps1 -Raw)
+          $exe = "$env:LOCALAPPDATA\Programs\Clawdy\Clawdy.exe"
+          if (-not (Test-Path $exe)) { throw "not installed" }
+          (Get-Item $exe).VersionInfo.ProductVersion
+          Start-Process "$env:LOCALAPPDATA\Programs\Clawdy\unins000.exe" -ArgumentList '/VERYSILENT' -Wait
+
+  windows-scoop:
+    name: Scoop on Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - run: |
+          Invoke-RestMethod get.scoop.sh -OutFile install-scoop.ps1
+          .\install-scoop.ps1 -RunAsAdmin
+          "$env:USERPROFILE\scoop\shims" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - run: |
+          scoop bucket add sebastianyauri https://github.com/SebastianYauri/scoop-bucket
+          scoop install clawdy
+          $exe = "$env:USERPROFILE\scoop\apps\clawdy\current\Clawdy.exe"
+          if (-not (Test-Path $exe)) { throw "not installed" }
+          (Get-Item $exe).VersionInfo.ProductVersion
+          scoop uninstall clawdy

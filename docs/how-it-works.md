@@ -71,6 +71,13 @@ open sessions:
 States with several animations rotate every few seconds while Claude Code stays
 in that state. After 15 minutes without any Claude Code activity, Clawdy naps.
 
+The state file also records when the last prompt started, when Claude finished
+(`Stop`) and when it last asked for you (`Notification`, `PermissionRequest`).
+From those marks the widget sends a *Claude finished* notification for tasks
+that took 30 seconds or more, and a *Claude needs you* notification (at most one
+per session every 20 seconds) when it waits for your permission or reply. Turn
+both off with **Notify when Claude finishes** in the menu.
+
 Hooks that belong to other tools are never touched: Clawdy only adds or removes
 entries that point at its own program, and keeps a backup of the previous file
 in `~/.claude/settings.json.clawdy-backup`. On Linux and macOS the hook command

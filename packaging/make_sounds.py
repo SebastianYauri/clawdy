@@ -36,3 +36,10 @@ def save(name, samples):
 # "bip-bip-biiip": a classic low-health warning
 save("alert.wav", square(880, 0.08, duty=0.25) + rest(0.04) + square(880, 0.08, duty=0.25) + rest(0.04)
      + square(1318.5, 0.22, duty=0.25, slide=-0.08))
+
+# a little victory arpeggio: a task finished
+save("done.wav", square(523.25, 0.07, duty=0.5) + square(659.25, 0.07, duty=0.5) + square(783.99, 0.07, duty=0.5)
+     + square(1046.5, 0.20, duty=0.5, slide=0.02))
+
+# "pi-ding?": Claude is waiting for you
+save("ask.wav", square(987.77, 0.07, duty=0.125) + rest(0.05) + square(1318.5, 0.16, duty=0.125, slide=0.05))
