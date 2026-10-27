@@ -415,6 +415,10 @@ def start_claude_login(path):
         return None
 
 
+def open_terminal(cmd):
+    return _terminal(cmd)
+
+
 def connect_claude_code():
     """Install Claude Code if needed and sign in, in a terminal the user can see.
     Falls back to the setup page when no terminal can be opened."""
@@ -431,6 +435,118 @@ def connect_claude_code():
         pass
     import webbrowser
     webbrowser.open("https://docs.claude.com/en/docs/claude-code/setup")
+    return False
+
+
+def pid_alive(pid):
+    if not pid:
+        return False
+    if WIN:
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        h = k32.OpenProcess(0x1000, False, int(pid))          # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        code = ctypes.c_ulong()
+        ok = k32.GetExitCodeProcess(h, ctypes.byref(code))
+        k32.CloseHandle(h)
+        return bool(ok) and code.value == 259                 # STILL_ACTIVE
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except PermissionError:
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def _ancestors(pid):
+    """pid, its parent, grandparent… (best effort, up to 12 levels)."""
+    chain, pid = [], int(pid)
+    parents = {}
+    if WIN:
+        import ctypes
+        from ctypes import wintypes
+
+        class PE(ctypes.Structure):
+            _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
+                        ("th32ProcessID", wintypes.DWORD), ("th32DefaultHeapID", ctypes.c_void_p),
+                        ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+                        ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", ctypes.c_long),
+                        ("dwFlags", wintypes.DWORD), ("szExeFile", ctypes.c_wchar * 260)]
+        k32 = ctypes.windll.kernel32
+        snap = k32.CreateToolhelp32Snapshot(2, 0)
+        pe = PE()
+        pe.dwSize = ctypes.sizeof(PE)
+        ok = k32.Process32FirstW(snap, ctypes.byref(pe))
+        while ok:
+            parents[pe.th32ProcessID] = (pe.th32ParentProcessID, pe.szExeFile.lower())
+            ok = k32.Process32NextW(snap, ctypes.byref(pe))
+        k32.CloseHandle(snap)
+    while pid > 1 and pid not in chain and len(chain) < 12:
+        chain.append(pid)
+        try:
+            if WIN:
+                pid = parents.get(pid, (0, ""))[0]
+            elif MAC:
+                pid = int(subprocess.run(["ps", "-o", "ppid=", "-p", str(pid)], capture_output=True,
+                                         text=True, timeout=2).stdout.strip() or 0)
+            else:
+                with open("/proc/%d/stat" % pid) as f:
+                    pid = int(f.read().rsplit(")", 1)[1].split()[1])
+        except Exception:
+            break
+    return chain, parents
+
+
+def focus_session(pid):
+    """Bring the window that hosts this Claude Code session to the front. Returns True
+    when it worked (Windows, macOS, Linux on X11; not possible on Wayland)."""
+    try:
+        chain, parents = _ancestors(pid)
+    except Exception:
+        return False
+    if WIN:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        skip = {"explorer.exe", "svchost.exe", "services.exe", "wininit.exe"}
+        ok_pids = [p for p in chain if parents.get(p, (0, ""))[1] not in skip]
+        found = {}
+
+        def visit(hwnd, _):
+            if user32.IsWindowVisible(hwnd) and user32.GetWindowTextLengthW(hwnd) > 0:
+                owner = wintypes.DWORD()
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+                if owner.value in ok_pids and owner.value not in found:
+                    found[owner.value] = hwnd
+            return True
+        user32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(visit), 0)
+        for p in ok_pids:                                     # closest ancestor first
+            if p in found:
+                user32.ShowWindow(found[p], 9)                # SW_RESTORE
+                return bool(user32.SetForegroundWindow(found[p]))
+        return False
+    if MAC:
+        for p in chain:
+            try:
+                path = subprocess.run(["ps", "-o", "comm=", "-p", str(p)], capture_output=True,
+                                      text=True, timeout=2).stdout.strip()
+            except Exception:
+                continue
+            if ".app/" in path:
+                subprocess.Popen(["open", "-a", path.split(".app/")[0] + ".app"])
+                return True
+        return False
+    if os.environ.get("WAYLAND_DISPLAY") and not shutil.which("xdotool"):
+        return False
+    if shutil.which("xdotool"):
+        for p in chain:
+            out = subprocess.run(["xdotool", "search", "--pid", str(p)], capture_output=True,
+                                 text=True, timeout=2).stdout.split()
+            if out:
+                return subprocess.run(["xdotool", "windowactivate", out[-1]],
+                                      capture_output=True, timeout=2).returncode == 0
     return False
 
 

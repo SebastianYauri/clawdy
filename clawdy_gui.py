@@ -19,6 +19,7 @@ from clawdy_i18n import STRINGS, t as tr
 from clawdy_system import SESSIONS
 from clawdy_tray import Tray
 from clawdy_walk import Walk
+import clawdy_sessions as sessions
 from clawdy_version import VERSION
 
 tk = None            # imported in run(): the hook doesn't need tkinter
@@ -207,7 +208,7 @@ def read_activity(now):
         except Exception:
             continue
         state, ts = s.get("state"), s.get("ts", 0)
-        if now - ts > 3600:
+        if now - ts > 3600 and not cs.pid_alive(s.get("pid")):
             try:
                 os.remove(path)          # abandoned session
             except OSError:
@@ -800,6 +801,7 @@ class Widget:
         self.press_panel(ev)
 
     def press_panel(self, ev):
+        self._press = (ev.x_root, ev.y_root, time.time())
         self._drag = True
         self._dx, self._dy = ev.x_root - self.root.winfo_x(), ev.y_root - self.root.winfo_y()
 
@@ -858,6 +860,57 @@ class Widget:
 
     def release(self, ev):
         self._drag = False
+        p, self._press = getattr(self, "_press", None), None
+        if p and abs(ev.x_root - p[0]) + abs(ev.y_root - p[1]) < 5 and time.time() - p[2] < 0.5:
+            self.sessions_menu(ev.x_root, ev.y_root)     # a click, not a drag
+
+    def sessions_menu(self, x, y):
+        """Click on Clawdy: open chats, recent chats and new chats, as one tree."""
+        if self.popup_menu:
+            self.popup_menu.close()
+        now = time.time()
+        opened = sessions.open_sessions(now)
+        recent = sessions.recent_sessions(exclude={s["id"] for s in opened}, limit=5)
+        projects = sessions.recent_projects(recent, opened)
+
+        def age(ts):
+            s = max(0, now - ts)
+            if s < 60:
+                return "%ds" % s
+            if s < 3600:
+                return "%dm" % (s // 60)
+            if s < 86400:
+                return "%dh" % (s // 3600)
+            return tr("sessions.yesterday") if s < 172800 else "%dd" % (s // 86400)
+
+        def short(text, n):
+            return text if len(text) <= n else text[:n - 1] + "…"
+
+        def focus(s):
+            if not cs.focus_session(s["pid"]):
+                self.flash(tr("sessions.cant_focus"), 4)
+
+        items = [("title", tr("sessions.title"), "")]
+        if opened:
+            items.append(("section", tr("sessions.open")))
+            for s in opened[:5]:
+                urgent = s["state"] in ("notification", "error")
+                state = label(s["state"], short=True) if s["state"] in PRIO else s["state"]
+                items.append(("action", short(s["project"], 16), lambda s=s: focus(s), None,
+                              "%s · %s" % (state, age(s["ts"])), ORANGE if urgent else None,
+                              ORANGE if urgent else (0.45, 0.78, 0.45)))
+        if recent:
+            items.append(("section", tr("sessions.recent")))
+            for s in recent:
+                items.append(("action", short(s["title"], 25), lambda s=s: sessions.resume(s), None,
+                              "%s · %s" % (short(s["project"], 12), age(s["ts"])), None, None))
+        if projects:
+            items.append(("pills", tr("sessions.new"),
+                          [(p, "+ " + short(os.path.basename(p) or p, 10)) for p in projects],
+                          lambda: None, sessions.new_chat_in, 3, "close"))
+        if len(items) == 1:
+            items.append(("note", tr("sessions.none")))
+        self.popup_menu = PopupMenu(self, x, y, items=items, width=300)
 
     def log(self, *parts):
         if self.dbg:
@@ -2448,10 +2501,12 @@ class PopupMenu:
     MW, ROW, PAD = 236, 26, 10
     COSTUMES = ("auto", "none", "witch", "pumpkin", "ghost", "vampire", "santa")
 
-    def __init__(self, w, x_root, y_root):
+    def __init__(self, w, x_root, y_root, items=None, width=None):
         self.w, self.k = w, w.k
         self.hover, self.left_at, self.closed = None, None, False
-        self.items = [
+        if width:
+            self.MW = width
+        self.items = items or [
             ("title", "Clawdy", "v" + VERSION),
             ("action", tr("menu.chat_app" if w.has_app else "menu.chat_web"), w.new_chat),
             ("action", tr("menu.refresh"), w.refresh),
@@ -2467,7 +2522,7 @@ class PopupMenu:
             ("sep",),
             ("action", tr("menu.quit"), w.root.destroy, "danger"),
         ]
-        if w.tray and w.tray.active:
+        if not items and w.tray and w.tray.active:
             self.items.insert(-1, ("action", tr("menu.hide"), w.hide))
         self.layout()
         k = self.k
@@ -2508,13 +2563,16 @@ class PopupMenu:
             elif kind == "sep":
                 self.drawn.append(("sep", it, P, y + 4, W - P, y + 4))
                 y += 9
+            elif kind in ("section", "note"):
+                self.drawn.append((kind, it, P, y, W - P, y + 20))
+                y += 20
             elif kind in ("action", "toggle"):
                 box = (P - 4, y, W - P + 4, y + R)
                 self.drawn.append((kind, it, *box))
                 self.hits.append((box, it, None))
                 y += R
             elif kind == "pills":
-                _, label, options, get, set_, per_row = it
+                _, label, options, get, set_, per_row = it[:6]
                 self.drawn.append(("label", it, P, y, W - P, y + 18))
                 y += 18
                 pw = (W - 2 * P - (per_row - 1) * 5) / per_row
@@ -2547,12 +2605,24 @@ class PopupMenu:
                 c.create_line(S(x1), S(y1), S(x2), S(y2), fill=hx((1, 1, 1), 0.10), width=1)
             elif kind == "label":
                 c.create_text(S(x1), S(y1 + 9), text=it[1], fill=hx(DIM), anchor="w", font=font(7, True))
+            elif kind == "section":
+                c.create_text(S(x1), S(y1 + 12), text=it[1].upper(), fill=hx(DIM), anchor="w", font=font(7, True))
+            elif kind == "note":
+                c.create_text(S(x1 + 8), S(y1 + 10), text=it[1], fill=hx(DIM), anchor="w", font=font(8))
             elif kind in ("action", "toggle"):
                 if hov:
                     round_rect(c, S(x1), S(y1 + 1), S(x2), S(y2 - 1), S(7), fill=hx((1, 1, 1), 0.08), width=0)
                 danger = kind == "action" and len(it) > 3 and it[3] == "danger"
                 col = (0.95, 0.45, 0.40) if danger else TXT
-                c.create_text(S(x1 + 8), S((y1 + y2) / 2), text=it[1], fill=hx(col), anchor="w", font=font(9))
+                lx = x1 + 8
+                if kind == "action" and len(it) > 6 and it[6]:          # status dot
+                    c.create_oval(S(lx), S((y1 + y2) / 2 - 3), S(lx + 6), S((y1 + y2) / 2 + 3),
+                                  fill=hx(it[6]), width=0)
+                    lx += 12
+                c.create_text(S(lx), S((y1 + y2) / 2), text=it[1], fill=hx(col), anchor="w", font=font(9))
+                if kind == "action" and len(it) > 4 and it[4]:          # detail on the right
+                    c.create_text(S(x2 - 6), S((y1 + y2) / 2), text=it[4], fill=hx(it[5] or DIM),
+                                  anchor="e", font=font(7))
                 if kind == "toggle":                       # switch
                     on = bool(it[2].get())
                     tx2, ty = S(x2 - 8), S((y1 + y2) / 2)
@@ -2606,7 +2676,7 @@ class PopupMenu:
             self.win.lift()
         elif kind == "pills":
             it[4](value)
-            if it[4] == self.w.set_scale:   # the widget was resized: so is the menu
+            if it[4] == self.w.set_scale or len(it) > 6:   # resized, or a launcher: close
                 self.close()
             else:
                 self.draw()

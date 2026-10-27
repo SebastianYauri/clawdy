@@ -129,6 +129,16 @@ pixel by pixel into images, and only redrawn when their values change.
 Everything else that doesn't animate is cached in a static layer; at 30 fps the
 widget stays at a few percent of one CPU core.
 
+## Your chats
+
+Clicking Clawdy opens a menu of your Claude Code chats. *Open now* comes from the
+hook's state files (which also record each session's folder and process) and
+brings that terminal window to the front where the system allows it (Windows,
+macOS, Linux on X11; Wayland doesn't let one app raise another's window).
+*Recent chats* are read from the transcripts Claude Code keeps in
+`~/.claude/projects` and reopen in a new terminal with `claude --resume`.
+*New chat in…* starts Claude Code in one of your recent project folders.
+
 ## Desktop walks
 
 While you're using Claude (Claude Code had activity in the last 10 minutes, or

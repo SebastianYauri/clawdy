@@ -19,7 +19,8 @@ DATA = os.environ.get("XDG_DATA_HOME") or os.path.join(HOME, ".local", "share")
 MENU = os.path.join(DATA, "applications", "clawdy.desktop")
 ICON = os.path.join(DATA, "icons", "hicolor", "256x256", "apps", "clawdy.png")
 FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
-         "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py"]
+         "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py",
+         "clawdy_sessions.py"]
 
 
 def add_to_menu(main_py):

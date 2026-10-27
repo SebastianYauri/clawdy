@@ -87,6 +87,9 @@ def handle(data):
     if new:
         s["state"] = new
     s["ts"] = time.time()
+    if data.get("cwd"):
+        s["cwd"] = str(data["cwd"])[:400]       # shown in the sessions list
+    s["pid"] = os.getppid()                     # Claude Code (or its shell): to find its window
 
     tmp = "%s.%d.tmp" % (path, os.getpid())
     with open(tmp, "w") as f:

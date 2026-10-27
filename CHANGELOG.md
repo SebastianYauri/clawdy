@@ -15,6 +15,8 @@ All notable changes to Clawdy are listed here. Versions follow
 - Installing from source on Linux now adds Clawdy to the applications menu, so
   you can find and reopen it after quitting.
 - New app icon: a crisp, pixel-perfect Clawdy at every size.
+- Click Clawdy for your Claude Code chats: bring an open one to the front,
+  resume a recent one in a terminal, or start a new chat in a recent project.
 
 ## 1.2.0
 

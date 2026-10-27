@@ -59,6 +59,7 @@ clawdy.py --hook        called by Claude Code on every event
 | `clawdy_i18n.py` | English and Spanish text |
 | `clawdy_tray.py` | tray / menu bar icon |
 | `clawdy_walk.py` | desktop walks |
+| `clawdy_sessions.py` | open and recent Claude Code chats for the click menu |
 | `clawdy_version.py` | version number, replaced by CI from the git tag |
 | `packaging/` | `.deb` script, Inno Setup script, CI hook test |
 

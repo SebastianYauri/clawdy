@@ -101,6 +101,7 @@ clone the repo and run `python3 install.py`. See [Building](docs/building.md).
 | Do this | To |
 |---|---|
 | Hover | Slide out the panel with every limit and its reset time |
+| Click Clawdy | Your Claude Code chats: bring an open one to the front, resume a recent one, or start a new chat in a recent project |
 | Click **+** | Start a new Claude chat |
 | Drag | Move Clawdy anywhere |
 | Right-click | Open the menu |
