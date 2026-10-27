@@ -819,6 +819,8 @@ class Widget:
         self.press_panel(ev)
 
     def press_panel(self, ev):
+        if self.popup_menu:
+            self.popup_menu.close()
         self._press = (ev.x_root, ev.y_root, time.time())
         self._drag = True
         self._dx, self._dy = ev.x_root - self.root.winfo_x(), ev.y_root - self.root.winfo_y()
@@ -2673,6 +2675,8 @@ def round_rect(canvas, x1, y1, x2, y2, r, **kw):
 
 
 GRACE = 3.0                            # seconds a menu waits for the mouse before closing by itself
+LEAVE_CLOSE = 0.45                     # …and how long it stays once the mouse leaves it. Wayland doesn't
+                                       # tell borderless windows about clicks elsewhere, so this is the cue
 
 
 class PopupMenu:
@@ -2862,7 +2866,7 @@ class PopupMenu:
         """Close by itself once the mouse has been gone for a while."""
         if self.closed:
             return
-        if self.left_at and time.time() - self.left_at > 1.2:
+        if self.left_at and time.time() - self.left_at > LEAVE_CLOSE:
             self.close()
             return
         self.win.after(200, self.watch)
