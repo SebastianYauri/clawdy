@@ -52,7 +52,7 @@ NAP_AFTER = 15 * 60                # no Claude Code activity for this long: take
 TRIP_EVERY = (10 * 60, 20 * 60)    # while you use Claude, now and then Clawdy goes for a walk
 IN_USE_FOR = 10 * 60               # Claude Code activity this recent counts as "using Claude"
 ALERT_AT = (80, 95)                 # percent: Clawdy raises the alarm (once per reset window)
-DONE_MIN = 30                       # tasks shorter than this finish without a notification
+DONE_AFTER = ((30, "30 s"), (60, "1 min"), (120, "2 min"), (300, "5 min"))   # notify for tasks this long
 ASK_GAP = 20                        # one "Claude needs you" per session within this many seconds
 # Intro once fresh usage arrives: walk in carrying a ball, throw it down, rings fill up.
 INTRO_WALK, INTRO_WIND, INTRO_FILL, INTRO_END = 1.4, 0.35, 0.9, 4.2
@@ -569,6 +569,7 @@ class Widget:
         self._alerts = []                   # filled by the fetch thread, shown on the Tk thread
         self.alarm_until, self.alarm_text = 0.0, ""
         self.v_tasks = tk.BooleanVar(value=cs.load_config().get("tasks", True))
+        self.done_after = int(cs.load_config().get("done_after", 300))
         self._marks, self._asked = None, {}
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.walk, self.away = None, False
@@ -1157,6 +1158,10 @@ class Widget:
     def toggle_tasks(self):
         cs.update_config(tasks=self.v_tasks.get())
 
+    def set_done_after(self, secs):
+        self.done_after = secs
+        cs.update_config(done_after=secs)
+
     def check_tasks(self):
         """Announce tasks that finished and Claude waiting for you, once each,
         from the marks the hook leaves in each session's state file."""
@@ -1183,7 +1188,7 @@ class Widget:
                 self._asked[sid] = ask
                 why = "task.permission" if s.get("ask_kind") == "permission" else "task.waiting"
                 self.announce(tr("task.ask_title"), tr(why, where=where), "ask", tr("task.ask_short"), ORANGE)
-            elif done > done0 and s.get("took", 0) >= DONE_MIN:
+            elif done > done0 and s.get("took", 0) >= self.done_after:
                 self.announce(tr("task.done_title"), tr("task.done_body", where=where, t=duration(s["took"])),
                               "done", tr("task.done_short"), (0.45, 0.78, 0.45))
 
@@ -2659,6 +2664,7 @@ class PopupMenu:
             ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
             ("toggle", tr("menu.sounds"), w.v_sounds, w.toggle_sounds),
             ("sep",),
+            ("pills", tr("menu.done_after"), list(DONE_AFTER), lambda: w.done_after, w.set_done_after, 4),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in self.COSTUMES], lambda: w.costume_pref, w.set_costume, 3),
             ("sep",),

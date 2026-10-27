@@ -42,7 +42,8 @@ juggles subagents… and throws confetti when the job is done.
 - **Alerts near your limits.** At 80 % and 95 % of any limit Clawdy raises the
   alarm and sends a system notification, once per reset window.
 - **"Claude finished" and "Claude needs you".** Started a long task and switched
-  to another window? When Claude Code finishes (tasks over 30 seconds) or stops to
+  to another window? When Claude Code finishes a long task (5 minutes or more by default; pick
+  30 s, 1, 2 or 5 min in the menu) or stops to
   wait for your permission or reply, you get a notification and a little 8-bit
   sound, and Clawdy tells you which project it was.
 - **Share your usage.** Right-click → **Share my usage** saves a pixel-art card

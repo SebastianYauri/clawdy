@@ -6,7 +6,8 @@ All notable changes to Clawdy are listed here. Versions follow
 ## 1.4.1
 
 - **"Claude finished" / "Claude needs you" notifications.** When a Claude Code
-  task that took 30 seconds or more finishes, or Claude stops to wait for your
+  task that took 5 minutes or more finishes (choose 30 s, 1, 2 or 5 min in the
+  menu), or Claude stops to wait for your
   permission or reply, you get a notification with the project name, an 8-bit
   sound and a line under Clawdy (**Done!** / **Needs you!**). Turn it off with
   **Notify when Claude finishes**.

@@ -90,6 +90,7 @@ STRINGS = {
     "menu.alerts": ("Alert near limits", "Avisar cerca del límite"),
     "menu.sounds": ("Sounds", "Sonidos"),
     "menu.tasks": ("Notify when Claude finishes", "Avisar cuando Claude termina"),
+    "menu.done_after": ("Notify for tasks longer than", "Avisar si la tarea tarda más de"),
     "menu.share": ("Share my usage", "Compartir mi uso"),
     "task.done_title": ("✅ Claude finished", "✅ Claude terminó"),
     "task.done_body": ("{where} · took {t}", "{where} · tardó {t}"),

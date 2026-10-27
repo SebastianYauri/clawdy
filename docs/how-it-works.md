@@ -74,7 +74,7 @@ in that state. After 15 minutes without any Claude Code activity, Clawdy naps.
 The state file also records when the last prompt started, when Claude finished
 (`Stop`) and when it last asked for you (`Notification`, `PermissionRequest`).
 From those marks the widget sends a *Claude finished* notification for tasks
-that took 30 seconds or more, and a *Claude needs you* notification (at most one
+that took 5 minutes or more (configurable: 30 s, 1, 2 or 5 min), and a *Claude needs you* notification (at most one
 per session every 20 seconds) when it waits for your permission or reply. Turn
 both off with **Notify when Claude finishes** in the menu.
 
