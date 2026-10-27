@@ -14,8 +14,8 @@ All notable changes to Clawdy are listed here. Versions follow
 - **Share my usage.** A new menu item (also in the tray) saves a pixel-art card
   with Clawdy and your limits to your Pictures folder, shows it in your file
   manager and opens a new post on X with the text filled in.
-- The tray / menu bar icon has a **Settings** submenu with every option of the
-  right-click menu: switches, notify threshold, size and costume.
+- The tray / menu bar icon shows the version and has **Settings…**, which opens
+  Clawdy's own menu window with every option.
 - **Install with one command:** `irm …/get.ps1 | iex` on Windows,
   `curl -fsSL …/get.sh | sh` on macOS and Linux, plus a
   [Scoop bucket](https://github.com/SebastianYauri/scoop-bucket) and a
