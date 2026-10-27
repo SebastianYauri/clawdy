@@ -96,6 +96,8 @@ def handle(data):
             s["ask_kind"] = kind                # both events can come for one request
         s["ask"] = now
     new = state_for(ev, tool)
+    if ev == "Notification" and s.get("ask_kind") == "waiting" and s.get("done", 0) >= s.get("started", 0):
+        new = None                              # "waiting for your input" after it finished: not urgent
     if new:
         s["state"] = new
     s["ts"] = now

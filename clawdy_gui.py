@@ -3343,6 +3343,8 @@ def run(demo=False, selftest=0):
             return
         if msg.startswith(b"walk") and app["widget"]:
             app["widget"].maybe_walk(force=True)
+            if not app["widget"].walk:
+                app["widget"].flash(tr("walk.busy"), 4)
         if msg.startswith(b"show"):
             if app["widget"]:
                 app["widget"].greet()

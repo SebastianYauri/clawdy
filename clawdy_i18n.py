@@ -116,6 +116,7 @@ STRINGS = {
     "sessions.working": ("{what} · for {t}", "{what} · lleva {t}"),
     "sessions.done_ago": ("finished {t} ago", "terminó hace {t}"),
     "sessions.idle": ("ready", "lista"),
+    "walk.busy": ("busy, can't go out now", "ocupado, ahora no puede salir"),
     "drag.held": ("Wheee!", "¡Wiii!"),
     "drag.dizzy": ("So dizzy…", "Mareado…"),
     "share.title": ("My Claude usage", "Mi uso de Claude"),
