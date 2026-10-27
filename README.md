@@ -147,6 +147,20 @@ Everything stays on your computer. The only other request Clawdy makes is to
 this GitHub repository, to see whether there is a new version. Details in
 [How it works](docs/how-it-works.md).
 
+## Is it safe?
+
+Clawdy is open source and every installer is built from this repository by
+[GitHub Actions](https://github.com/SebastianYauri/clawdy/actions), never on a
+personal computer. Each release lists the SHA-256 of its files in
+`SHA256SUMS.txt` and links its VirusTotal report.
+
+For the current Windows installer, [VirusTotal](https://www.virustotal.com/gui/file/23abdbd627b6ba05a9a82c3468f7be545f578cf13e9fa4ac6b7518e009b093f1) shows Microsoft Defender,
+Kaspersky, ESET, Malwarebytes, McAfee, Sophos, Symantec, BitDefender and the
+other major engines finding nothing. A handful of machine-learning engines flag
+it generically: they do that with most apps packaged with PyInstaller, because
+malware uses PyInstaller too. If you'd rather not run an installer at all,
+`python3 install.py` runs Clawdy straight from the source code.
+
 ## Updates
 
 - **Windows and macOS** update silently and reopen.
