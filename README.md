@@ -41,6 +41,11 @@ juggles subagents… and throws confetti when the job is done.
   Christmas.
 - **Alerts near your limits.** At 80 % and 95 % of any limit Clawdy raises the
   alarm and sends a system notification, once per reset window.
+- **Will it last?** From your last hour of use the panel tells you, for each
+  limit, *full in 1h 20m* (red) or *enough until reset* (green). If a limit is
+  on course to fill within 45 minutes, before it resets, you get a heads-up.
+- **Back in business.** When a limit you had used past 50 % resets, Clawdy
+  dances and tells you that you can carry on.
 - **"Claude finished" and "Claude needs you".** Started a long task and switched
   to another window? When Claude Code finishes a long task (5 minutes or more by default; pick
   30 s, 1, 2 or 5 min in the menu) or stops halfway
@@ -144,7 +149,7 @@ Python 3.8+ and tkinter clone the repo and run `python3 install.py`. See
 | Do this | To |
 |---|---|
 | Hover | Slide out the panel with every limit and its reset time |
-| Click Clawdy | Your Claude Code chats: bring an open one to the front, resume a recent one, or start a new chat in a recent project |
+| Click Clawdy | Your Claude Code chats: each open one with what it's doing (*Writing · for 12m*, *needs your permission · 2m*, *finished 5m ago*) so you can jump to the one that needs you; resume a recent one, or start a new chat in a recent project |
 | Click **+** | Start a new Claude chat |
 | Click the **pin** (top left) | Pin Clawdy in place so dragging doesn't move it; click again to free it |
 | Drag | Move Clawdy anywhere: it dangles from the mouse, and gets dizzy if you shake it |

@@ -71,6 +71,10 @@ open sessions:
 States with several animations rotate every few seconds while Claude Code stays
 in that state. After 15 minutes without any Claude Code activity, Clawdy naps.
 
+To show your pace, Clawdy keeps the last six hours of usage readings in
+`history.json` in its cache folder (only percentages and reset times) and
+compares the latest one with one from 15 to 90 minutes earlier.
+
 The state file also records when the last prompt started, when Claude finished
 (`Stop`) and when it last asked for you (`Notification`, `PermissionRequest`).
 From those marks the widget sends a *Claude finished* notification for tasks

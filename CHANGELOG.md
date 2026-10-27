@@ -5,6 +5,15 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.3
 
+- **Pace.** The panel shows, for each limit, whether it lasts until it resets
+  (*enough until reset*) or when it will fill at your pace of the last hour
+  (*full in 1h 20m*). If one would fill within 45 minutes, before resetting, you
+  get a notification.
+- **Renewed.** When a limit you had used past 50 % resets, you get a
+  notification and Clawdy dances: you can carry on.
+- **The chats tree shows what each open session is doing**: what Claude is up
+  to and for how long, *needs your permission* (in orange, at the top), or
+  *finished 5m ago*.
 - **Pick Clawdy up.** Drag it and it dangles from the mouse: it stretches with
   joy going up ("Wheee!"), squashes and sweats going down, and swings behind the
   movement. Shake it (or throw it) and it gets dizzy, with X eyes and stars

@@ -52,6 +52,9 @@ NAP_AFTER = 15 * 60                # no Claude Code activity for this long: take
 TRIP_EVERY = (10 * 60, 20 * 60)    # while you use Claude, now and then Clawdy goes for a walk
 IN_USE_FOR = 10 * 60               # Claude Code activity this recent counts as "using Claude"
 ALERT_AT = (80, 95)                 # percent: Clawdy raises the alarm (once per reset window)
+PACE_WINDOW = (15 * 60, 90 * 60)    # the pace compares with a sample 15–90 minutes old
+PACE_ALERT = 45 * 60                # warn when a limit would fill within this, before it resets
+RENEW_FROM = 50                     # announce a reset when the limit was at least this full
 DONE_AFTER = ((30, "30 s"), (60, "1 min"), (120, "2 min"), (300, "5 min"))   # notify for tasks this long
 ASK_GAP = 20                        # one "Claude needs you" per session within this many seconds
 # Intro once fresh usage arrives: walk in carrying a ball, throw it down, rings fill up.
@@ -340,7 +343,25 @@ def until(iso):
 def duration(secs):
     m, s = divmod(int(secs), 60)
     h, m = divmod(m, 60)
-    return "%dh %dm" % (h, m) if h else ("%dm %ds" % (m, s) if m else "%ds" % s)
+    return "%dh %dm" % (h, m) if h else ("%dm" % m if m else "%ds" % s)
+
+
+def secs_until(iso):
+    try:
+        return (datetime.fromisoformat(iso) - datetime.now(timezone.utc)).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
+
+def pace(hist, name, p, reset, now):
+    """Seconds until this limit fills at the pace of the last hour, or None if it isn't climbing."""
+    old = [(t, row[name][0]) for t, row in hist
+           if name in row and row[name][1] == reset and PACE_WINDOW[0] <= now - t <= PACE_WINDOW[1]]
+    if not old or p >= 100:
+        return None
+    t0, p0 = min(old)
+    rate = (p - p0) / (now - t0)
+    return (100 - p) / rate if rate > 0.0005 / 60 else None
 
 
 ORDER = {"session": 0, "weekly_all": 1, "weekly_scoped": 2, "spend": 3}
@@ -575,6 +596,12 @@ class Widget:
         self._marks, self._asked = None, {}
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.held = False                    # being carried around with the mouse
+        self.hist = self.load_history()      # [(time, {limit: (percent, resets_at)})] for the pace
+        self._fresh = False                  # new usage arrived (set by the fetch thread)
+        self._renew = {}                     # limits worth announcing when they reset
+        if demo:                             # a made-up last hour, so the demo shows a pace
+            then = time.time() - 40 * 60
+            self.hist = [(then, {n: (p - (25 if i == 0 else 2), r) for i, (n, p, r) in enumerate(bars(self.st.data))})]
         self.v_lock = tk.BooleanVar(value=bool(cs.load_config().get("locked", False)))
         self.pin_hover, self.pin_click = 0.0, -10.0
         self._vel, self._last_drag = (0.0, 0.0), None
@@ -950,10 +977,9 @@ class Widget:
         if opened:
             items.append(("section", tr("sessions.open")))
             for s in opened[:5]:
-                urgent = s["state"] in ("notification", "error")
-                state = label(s["state"], short=True) if s["state"] in PRIO else s["state"]
+                detail, urgent = self.session_detail(s, now, age)
                 items.append(("action", short(s["project"], 16), lambda s=s: focus(s), None,
-                              "%s · %s" % (state, age(s["ts"])), ORANGE if urgent else None,
+                              detail, ORANGE if urgent else None,
                               ORANGE if urgent else (0.45, 0.78, 0.45)))
         if recent:
             items.append(("section", tr("sessions.recent")))
@@ -967,6 +993,19 @@ class Widget:
         if len(items) == 1:
             items.append(("note", tr("sessions.none")))
         self.popup_menu = PopupMenu(self, x, y, items=items, width=300)
+
+    def session_detail(self, s, now, age):
+        """What an open session is up to, in a few words: (text, needs you?)."""
+        working = s["started"] and s["started"] > max(s["done"], 0)
+        if s["state"] == "notification" and s.get("ask_kind") == "permission" and s["ask"] >= s["started"]:
+            return tr("sessions.permission", t=age(s["ask"])), True
+        if s["state"] == "error":
+            return label("error", short=True), True
+        if working and s["state"] in PRIO and s["state"] not in ("happy", "notification"):
+            return tr("sessions.working", what=label(s["state"], short=True), t=age(s["started"])), False
+        if s["done"]:
+            return tr("sessions.done_ago", t=age(s["done"])), False
+        return tr("sessions.idle"), False
 
     def log(self, *parts):
         if self.dbg:
@@ -1082,6 +1121,7 @@ class Widget:
         now = time.time()
         if outcome == "ok" and self.st.data:
             self.queue_alerts()
+            self._fresh = True                  # the Tk thread records it (see after_data)
         if not self.ready and self.st.data and not self.st.error and self.st.fresh():
             self.start_intro()
         if outcome == "offline":                # e.g. right after boot: retry soon, then back off
@@ -1218,6 +1258,53 @@ class Widget:
             self.alarm_until = time.time() + 4.0
             self.alarm_text = tr("alert.short", name=short_name(name), p=round(p))
 
+    # ------------------------------------------------ pace and renewals
+
+    def load_history(self):
+        try:
+            return [(t, {n: tuple(v) for n, v in row.items()})
+                    for t, row in json.load(open(os.path.join(cs.cache_dir(), "history.json")))]
+        except Exception:
+            return []
+
+    def after_data(self):
+        """New usage: remember it for the pace, warn if a limit is filling too fast,
+        and watch the full ones so their reset can be announced."""
+        now = time.time()
+        rows = bars(self.st.data)
+        self.hist = [h for h in self.hist if now - h[0] < 6 * 3600]
+        if not self.hist or now - self.hist[-1][0] > 60:
+            self.hist.append((now, {n: (p, r) for n, p, r in rows}))
+            try:
+                cs.write_json(os.path.join(cs.cache_dir(), "history.json"), self.hist)
+            except OSError:
+                pass
+        for name, p, reset in rows:
+            if p >= RENEW_FROM and reset:
+                self._renew[name] = (p, reset)
+            if not (reset and self.v_alerts.get()) or p >= ALERT_AT[-1]:
+                continue
+            eta, left = pace(self.hist, name, p, reset, now), secs_until(reset)
+            if eta and left and eta < left and eta <= PACE_ALERT:
+                seen = cs.load_config().get("paced") or []
+                key = "%s|%s" % (name, reset)
+                if key not in seen:
+                    cs.update_config(paced=(seen + [key])[-30:])
+                    self.announce(tr("pace.alert_title", name=name),
+                                  tr("pace.alert_body", t=duration(eta), r=until(reset)),
+                                  "alert", tr("pace.short", t=duration(eta)), (0.95, 0.40, 0.35))
+
+    def check_renewals(self):
+        """A limit that was getting full just reset: say you can carry on."""
+        for name, (p, reset) in list(self._renew.items()):
+            left = secs_until(reset)
+            if left is not None and left <= 0:
+                del self._renew[name]
+                if self.v_alerts.get() and -left < 3600:      # not hours late (e.g. after a long sleep)
+                    self.announce(tr("renew.title", name=name), tr("renew.body", p=round(p)),
+                                  "done", tr("renew.short"), (0.45, 0.78, 0.45))
+                    self.force, self.act_t = "dance", 0.0
+
     def toggle_alerts(self):
         cs.update_config(alerts=self.v_alerts.get())
 
@@ -1302,6 +1389,10 @@ class Widget:
         """Runs every 2 s without touching the network unless a request is due."""
         self.maybe_walk()
         self.check_tasks()
+        if self._fresh:
+            self._fresh = False
+            self.after_data()
+        self.check_renewals()
         if self._alerts and not self.hidden:
             self.show_alerts()
         if self.demo and not self.ready and time.time() - self.t0 > 1.5:
@@ -2634,6 +2725,13 @@ class Widget:
                     self.text(x1 - 26, y, until(reset), hx(DIM, a), 5, anchor="e")
                 else:
                     self.text(x0, y + 15, tr("time.resets_in", t=until(reset)), hx(DIM, a), 5)
+                    eta, left = pace(self.hist, name, p, reset, time.time()), secs_until(reset)
+                    if eta and left:
+                        if eta < left:
+                            self.text(x1, y + 15, tr("pace.full", t=duration(eta)), hx((0.95, 0.45, 0.38), a),
+                                      5, bold=True, anchor="e")
+                        else:
+                            self.text(x1, y + 15, tr("pace.ok"), hx((0.45, 0.78, 0.45), a), 5, anchor="e")
             self.rect(x0, y + 6, x1 - x0, 3, hx((1, 1, 1), 0.12 * a))
             self.rect(x0, y + 6, (x1 - x0) * min(p, 100) / 100, 3, hx(bar_color(p), a))
             y += gap

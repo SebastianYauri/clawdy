@@ -35,7 +35,9 @@ def open_sessions(now=None):
         if not pid and now - s.get("ts", 0) > 3600:
             continue
         out.append({"id": name[:-5], "cwd": s.get("cwd"), "project": _project(s.get("cwd")),
-                    "state": s.get("state") or "idle", "ts": s.get("ts", 0), "pid": pid})
+                    "state": s.get("state") or "idle", "ts": s.get("ts", 0), "pid": pid,
+                    "started": s.get("started", 0), "done": s.get("done", 0),
+                    "ask": s.get("ask", 0), "ask_kind": s.get("ask_kind")})
     urgent = {"notification": 0, "error": 1}
     out.sort(key=lambda x: (urgent.get(x["state"], 2), -x["ts"]))
     return out
