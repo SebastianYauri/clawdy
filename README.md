@@ -77,6 +77,8 @@ to Claude Code or starting at login.
 > Privacy & Security** and click **Open Anyway**. Then, when macOS asks whether
 > *Clawdy* may use *Claude Code-credentials*, click **Always Allow**: that's
 > your Claude Code session, which Clawdy needs to read your usage.
+> Because the macOS build isn't signed with a paid Apple Developer ID yet, macOS
+> may ask this again after an update.
 
 **Other systems** (Intel Macs, Fedora, Arch…): with Python 3.8+ and tkinter,
 clone the repo and run `python3 install.py`. See [Building](docs/building.md).
