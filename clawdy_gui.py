@@ -554,6 +554,7 @@ class Widget:
         self.hidden = False
         self.v_walks = tk.BooleanVar(value=cs.load_config().get("walks", True))
         self.walk, self.away = None, False
+        self.setup_phase = None              # installing Claude Code / waiting for the browser
         soon = os.environ.get("CLAWDY_WALK_IN")
         self.next_trip = time.time() + (float(soon) if soon else random.uniform(*TRIP_EVERY))
         self._walk_clock = time.perf_counter()
@@ -788,11 +789,9 @@ class Widget:
             self._drag = False
             self.install_update()
             return
-        if ev.y / self.k > INFO_Y - 9 and self.no_usage():
+        if ev.y / self.k > INFO_Y - 9 and self.no_usage() and not self.setup_phase:
             self._drag = False
-            cs.connect_claude_code()
-            self.flash(tr("need.opened"), 60)
-            self._next_fetch = time.time() + 15
+            self.setup_claude_code()
             return
         if self.on_plus(ev.x / self.k, ev.y / self.k):
             self._drag = False
@@ -937,6 +936,37 @@ class Widget:
             self._next_fetch = max(self.st.retry_at, self.st.updated + POLL)
         else:
             self._next_fetch = now + POLL
+
+    def setup_claude_code(self):
+        """Install Claude Code if needed and sign in, without any terminal: the only
+        thing the user does is approve in the browser."""
+        from tkinter import messagebox
+        login_only = self.st.need == "login"
+        if not messagebox.askyesno(tr("need.ask_title"), tr("need.ask_login" if login_only else "need.ask"),
+                                   parent=self.root):
+            return
+        self.setup_phase = "browser" if login_only else "installing"
+
+        def work():
+            path = cs.claude_code_path() or cs.install_claude_code()
+            if not path:                        # last resort: the visible terminal
+                self.setup_phase = None
+                cs.connect_claude_code()
+                self.flash(tr("need.opened"), 60)
+                return
+            self.setup_phase = "browser"
+            proc = cs.start_claude_login(path)
+            try:                                # finishes by itself once the user approves
+                proc and proc.wait(timeout=600)
+            except Exception:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+            self.setup_phase = None
+            self._stamp = None                  # make sync() look at the new session right away
+            self._next_fetch = 0.0
+        threading.Thread(target=work, daemon=True).start()
 
     def no_usage(self):
         """No Claude Code session to read usage from: Clawdy works, the rings stay empty."""
@@ -2077,7 +2107,7 @@ class Widget:
             q = round(f * 14) / 14          # a few steps: each one re-renders the rings
             rows = [(n, p * q, r) for n, p, r in rows]
         near = bool(self.mouse and self.on_plus(*self.mouse))
-        key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, st.error,
+        key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, st.error, self.setup_phase,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
         if key != self._skey:               # rebuild the static layer only when something changed
             self._skey = key
@@ -2237,6 +2267,8 @@ class Widget:
             self.text(mid, INFO_Y, upd[0], hx(upd[1]), 5, bold=True, anchor="center")
         elif self.work:
             self.text(mid, INFO_Y, label(self.work, short=True), hx(ORANGE), 6, bold=True, anchor="center")
+        elif not rows and self.setup_phase:
+            self.text(mid, INFO_Y, tr("need." + self.setup_phase), hx(ORANGE), 5, bold=True, anchor="center")
         elif not rows and self.no_usage():     # clickable: sets up Claude Code
             self.text(mid, INFO_Y, tr("need." + self.st.need), hx(ORANGE), 5, bold=True, anchor="center")
         elif not rows:

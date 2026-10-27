@@ -71,8 +71,9 @@ Get the file for your computer from the
 
 Clawdy reads your usage from [Claude Code](https://claude.com/claude-code). Only
 have the Claude desktop app? Clawdy still works (mascot, chat button, walks), and
-clicking **Click to see your usage** opens a terminal that installs Claude Code
-with the official installer and signs you in. The first time Clawdy opens it
+clicking **Click to see your usage** sets Claude Code up for you in the
+background with the official installer: all you do is click **Authorize** in the
+browser window that opens. No terminal, no commands. The first time Clawdy opens it
 explains what it does and asks before connecting to Claude Code or starting at
 login.
 

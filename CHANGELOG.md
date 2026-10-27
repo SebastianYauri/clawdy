@@ -7,8 +7,9 @@ All notable changes to Clawdy are listed here. Versions follow
 
 - Works without Claude Code: with only the Claude desktop app, Clawdy keeps its
   animations, chat button and walks, with empty rings and a **Click to see your
-  usage** prompt that installs Claude Code and signs you in, in a terminal you
-  can see. When Claude Code is installed but signed out, the click just signs in.
+  usage** prompt. One click (and one confirmation) installs Claude Code in the
+  background and opens the browser: just click Authorize, no terminal or
+  commands. When Claude Code is installed but signed out, the click just signs in.
 
 ## 1.2.0
 

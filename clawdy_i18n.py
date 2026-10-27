@@ -30,6 +30,17 @@ STRINGS = {
     "need.install": ("Click to see your usage", "Clic para ver tu uso"),
     "need.login": ("Click to sign in", "Clic para iniciar sesión"),
     "need.opened": ("finish in the terminal window", "termina en la ventana de terminal"),
+    "need.installing": ("installing Claude Code…", "instalando Claude Code…"),
+    "need.browser": ("approve in your browser", "aprueba en tu navegador"),
+    "need.ask_title": ("See your Claude usage", "Ver tu uso de Claude"),
+    "need.ask": ("To show your usage, Clawdy needs Claude Code (free with your Claude plan).\n\n"
+                 "Install it and sign in now? Your browser will open so you can approve.",
+                 "Para mostrar tu uso, Clawdy necesita Claude Code (gratis con tu plan de Claude).\n\n"
+                 "¿Instalarlo e iniciar sesión ahora? Se abrirá tu navegador para que lo apruebes."),
+    "need.ask_login": ("Sign in to Claude Code so Clawdy can show your usage?\n\n"
+                       "Your browser will open so you can approve.",
+                       "¿Iniciar sesión en Claude Code para que Clawdy muestre tu uso?\n\n"
+                       "Se abrirá tu navegador para que lo apruebes."),
 
     "act.thinking": ("Thinking…", "Pensando…"),
     "act.typing": ("Writing code", "Escribiendo código"),

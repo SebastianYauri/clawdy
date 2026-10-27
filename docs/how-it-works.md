@@ -13,11 +13,14 @@ session that Claude Code already keeps on your computer:
 
 Only Claude Code's session can be read: the Claude desktop app keeps its own
 session encrypted, and Clawdy doesn't try to get at it. Without Claude Code,
-Clawdy keeps working with empty rings and **Click to see your usage**; the click
-opens a terminal running the official installer
+Clawdy keeps working with empty rings and **Click to see your usage**. After you
+confirm, Clawdy runs the official installer in the background
 (`curl -fsSL https://claude.ai/install.sh | bash`, or `irm https://claude.ai/install.ps1 | iex`
-on Windows) followed by `claude auth login`. When Claude Code is already
-installed it only runs the sign-in.
+on Windows) and then `claude auth login --claudeai`, which opens your browser;
+once you click **Authorize** the sign-in completes by itself and your usage
+appears. When Claude Code is already installed it only runs the sign-in. If the
+background install fails, Clawdy falls back to running the same commands in a
+visible terminal.
 
 This is your Claude subscription session, **not an API key**, so checking your
 usage is free and doesn't count against your plan. Clawdy never writes or

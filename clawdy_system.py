@@ -385,6 +385,35 @@ def _terminal(cmd):
     return False
 
 
+_HIDDEN = 0x08000000 if WIN else 0          # CREATE_NO_WINDOW
+
+
+def install_claude_code(timeout=600):
+    """Run the official Claude Code installer in the background. Returns the CLI path or None."""
+    if WIN:
+        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
+               "-Command", INSTALL_PS]
+    else:
+        cmd = ["bash", "-c", INSTALL_SH]
+    try:
+        subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=timeout, creationflags=_HIDDEN, cwd=HOME)
+    except Exception:
+        return None
+    return claude_code_path()
+
+
+def start_claude_login(path):
+    """Start `claude auth login` without a terminal. It opens the browser and finishes by
+    itself once the user clicks Authorize. Returns the process (to stop it later) or None."""
+    try:
+        return subprocess.Popen([path, "auth", "login", "--claudeai"], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                creationflags=_HIDDEN, cwd=HOME, start_new_session=not WIN)
+    except Exception:
+        return None
+
+
 def connect_claude_code():
     """Install Claude Code if needed and sign in, in a terminal the user can see.
     Falls back to the setup page when no terminal can be opened."""
