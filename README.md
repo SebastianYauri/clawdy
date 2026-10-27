@@ -19,6 +19,36 @@ juggles subagents… and throws confetti when the job is done.
 </p>
 <p align="center"><sub>Clawdy reacting live to a Claude Code session · <a href="docs/media/desktop.mp4">watch in HD (MP4)</a></sub></p>
 
+## Install
+
+**Windows** (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/SebastianYauri/clawdy/main/get.ps1 | iex
+```
+
+**macOS and Linux** (Terminal):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/SebastianYauri/clawdy/main/get.sh | sh
+```
+
+**Scoop** (Windows):
+
+```powershell
+scoop bucket add sebastianyauri https://github.com/SebastianYauri/scoop-bucket
+scoop install clawdy
+```
+
+**Homebrew** (Mac):
+
+```sh
+brew install --cask sebastianyauri/tap/clawdy
+```
+
+Prefer a regular installer? Grab it from the [latest release](https://github.com/SebastianYauri/clawdy/releases/latest)
+(see [Download](#download) for details). Free, no API key, updates itself.
+
 ## Features
 
 - **Usage at a glance.** Three rings around Clawdy show your 5-hour session,
