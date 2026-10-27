@@ -50,18 +50,43 @@ class Tray:
 
         def call(fn):
             return lambda icon, item: self.calls.put(fn)
+
+        # pystray asks for check marks from its own thread: read plain values, never Tk variables
+        def cfg(key, default=True):
+            return lambda item: bool(cs.load_config().get(key, default))
+
+        def switch(var, apply, checked):
+            return Item(var[0], call(lambda: w.flip(var[1], apply)), checked=checked)
+
+        def choice(options, get, set_):
+            return P.Menu(*[Item(text, call(lambda v=value: (set_(v), self.refresh())),
+                                 checked=lambda item, v=value: get() == v, radio=True)
+                            for value, text in options])
+
+        from clawdy_gui import DONE_AFTER, SIZES, PopupMenu
+        settings = P.Menu(
+            switch((tr("menu.hooks"), w.v_hooks), w.toggle_hooks, lambda item: cs.hooks_installed()),
+            switch((tr("menu.autostart"), w.v_start), w.toggle_start, lambda item: cs.autostart_enabled()),
+            switch((tr("menu.pin"), w.v_pin), w.toggle_pin, cfg("expanded", False)),
+            switch((tr("menu.walks"), w.v_walks), w.toggle_walks, cfg("walks")),
+            switch((tr("menu.alerts"), w.v_alerts), w.toggle_alerts, cfg("alerts")),
+            switch((tr("menu.tasks"), w.v_tasks), w.toggle_tasks, cfg("tasks")),
+            switch((tr("menu.sounds"), w.v_sounds), w.toggle_sounds, cfg("sounds")),
+            P.Menu.SEPARATOR,
+            Item(tr("menu.done_after"), choice(DONE_AFTER, lambda: w.done_after, w.set_done_after)),
+            Item(tr("menu.size"), choice([(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale)),
+            Item(tr("menu.costume"), choice([(c, tr("costume." + c)) for c in PopupMenu.COSTUMES],
+                                            lambda: w.costume_pref, w.set_costume)),
+        )
         return P.Menu(
             Item(lambda item: tr("tray.hide") if w.visible() else tr("tray.show"),
                  call(w.toggle_visible), default=True),
             Item(tr("menu.chat_app" if w.has_app else "menu.chat_web"), call(w.new_chat)),
             Item(tr("menu.share"), call(w.share)),
             Item(tr("menu.refresh"), call(w.refresh)),
-            P.Menu.SEPARATOR,
-            Item(tr("menu.hooks"), call(lambda: w.flip(w.v_hooks, w.toggle_hooks)),
-                 checked=lambda item: cs.hooks_installed()),
-            Item(tr("menu.autostart"), call(lambda: w.flip(w.v_start, w.toggle_start)),
-                 checked=lambda item: cs.autostart_enabled()),
             Item(tr("menu.updates"), call(lambda: w.check_updates(True))),
+            P.Menu.SEPARATOR,
+            Item(tr("menu.settings"), settings),
             P.Menu.SEPARATOR,
             Item(tr("menu.quit"), call(w.root.destroy)),
         )

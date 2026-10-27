@@ -147,7 +147,7 @@ Python 3.8+ and tkinter clone the repo and run `python3 install.py`. See
 | Click **+** | Start a new Claude chat |
 | Drag | Move Clawdy anywhere |
 | Right-click | Open the menu |
-| Tray / menu bar icon | Show or hide Clawdy, new chat, refresh, settings, quit |
+| Tray / menu bar icon | Show or hide Clawdy, new chat, share, refresh, every setting, quit |
 
 <p align="center">
   <img src="docs/media/menu.png" alt="The right-click menu" width="300">
