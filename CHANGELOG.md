@@ -11,6 +11,11 @@ All notable changes to Clawdy are listed here. Versions follow
   scrolling terminal, reading uses a magnifying glass, and finishing a task
   brings a victory dance or fireworks.
 - Clawdy takes a nap after 15 minutes without Claude Code activity.
+- Usage is up to date right after you turn on your computer: Clawdy no longer
+  spends a request on an expired session (it waits for Claude Code to renew it
+  and refreshes the moment it does), retries within seconds when the network
+  isn't up yet, and refreshes as soon as the computer wakes from sleep.
+- Limits that already reset show 0 % instead of yesterday's numbers.
 
 ## 1.0.0
 

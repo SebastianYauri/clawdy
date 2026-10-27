@@ -118,12 +118,26 @@ def _keychain(secret):
     return raw if secret else "ok"
 
 
-def read_token():
-    """Claude Code's OAuth access token. Raises FileNotFoundError when signed out."""
+def read_session():
+    """(access token, expiry in epoch seconds or None). Raises FileNotFoundError when signed out."""
     raw = _keychain(True) if MAC else None
     if raw is None:
         raw = open(CREDENTIALS, encoding="utf-8").read()
-    return json.loads(raw)["claudeAiOauth"]["accessToken"]
+    oauth = json.loads(raw)["claudeAiOauth"]
+    exp = oauth.get("expiresAt")
+    return oauth["accessToken"], (exp / 1000.0 if exp else None)
+
+
+def read_token():
+    return read_session()[0]
+
+
+def session_stamp():
+    """Changes whenever Claude Code renews its session (cheap; None on macOS)."""
+    try:
+        return os.path.getmtime(CREDENTIALS)
+    except OSError:
+        return None
 
 
 def logged_in():

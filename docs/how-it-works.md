@@ -16,7 +16,11 @@ usage is free and doesn't count against your plan. Clawdy never writes or
 refreshes the token; if it expires, open Claude Code once and it renews it.
 
 Clawdy asks at most once every 5 minutes and caches the answer on disk, so
-restarting the widget doesn't trigger another request. If the endpoint answers
+restarting the widget doesn't trigger another request. Right after start-up or waking from sleep it
+refreshes immediately. If Claude Code's session has expired, Clawdy waits
+without making a request and refreshes the moment Claude Code renews it; if the
+network isn't up yet, it retries after 5, 10, 20… seconds. Cached limits whose
+reset time has passed are shown as 0 %. If the endpoint answers
 `429 Too Many Requests`, Clawdy waits as long as the server asks (5 minutes at
 least) and remembers that across restarts.
 

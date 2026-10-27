@@ -253,10 +253,14 @@ class State:
 
 
 def fetch(st):
+    """One usage request. Returns "ok", "expired", "rate", "auth", "offline", "error" or "skip"."""
     if time.time() < st.retry_at or st.fresh():
-        return
+        return "skip"
     try:
-        tok = cs.read_token()
+        tok, expires = cs.read_session()
+        if expires and expires < time.time() + 20:
+            st.error = tr("error.renew")       # don't spend a request on a dead token
+            return "expired"
         req = urllib.request.Request(URL, headers={
             "Authorization": "Bearer " + tok,
             "anthropic-beta": "oauth-2025-04-20",
@@ -264,6 +268,7 @@ def fetch(st):
         st.data = json.loads(urllib.request.urlopen(req, timeout=20).read())
         st.error, st.updated, st.retry_at = None, time.time(), 0
         st.save()
+        return "ok"
     except urllib.error.HTTPError as e:
         if e.code == 429:
             try:
@@ -273,16 +278,20 @@ def fetch(st):
             st.retry_at = time.time() + max(wait, 300)
             st.error = tr("error.rate_limited")
             st.save()
-        elif e.code == 401:
+            return "rate"
+        if e.code == 401:
             st.error = tr("error.renew")
-        else:
-            st.error = "HTTP %d" % e.code
+            return "auth"
+        st.error = "HTTP %d" % e.code
     except (FileNotFoundError, KeyError):
         st.error = tr("error.login")
-    except urllib.error.URLError:
+        return "auth"
+    except (urllib.error.URLError, OSError):
         st.error = tr("error.offline")
+        return "offline"
     except Exception as e:
         st.error = str(e)[:40]
+    return "error"
 
 
 def demo_data():
@@ -333,14 +342,26 @@ def bars(data):
         else:
             model = ((lim.get("scope") or {}).get("model") or {}).get("display_name")
             name = tr("limit.weekly_model", model=model) if model else tr("limit.other")
-        found.append((ORDER.get(kind, 9), name, float(lim.get("percent") or 0), lim.get("resets_at")))
+        pct, reset = float(lim.get("percent") or 0), lim.get("resets_at")
+        if _passed(reset):                 # cached data from before a reset: it's 0 now
+            pct, reset = 0.0, None
+        found.append((ORDER.get(kind, 9), name, pct, reset))
     out = [(n, p, r) for _, n, p, r in sorted(found, key=lambda f: f[0])]
     if not out:
         for key, name in (("five_hour", tr("limit.session")), ("seven_day", tr("limit.weekly"))):
             w = data.get(key)
             if w:
-                out.append((name, float(w.get("utilization") or 0), w.get("resets_at")))
+                reset = w.get("resets_at")
+                out.append((name, 0.0 if _passed(reset) else float(w.get("utilization") or 0),
+                            None if _passed(reset) else reset))
     return out
+
+
+def _passed(iso):
+    try:
+        return bool(iso) and datetime.fromisoformat(iso) <= datetime.now(timezone.utc)
+    except ValueError:
+        return False
 
 
 def short_name(name):
@@ -523,8 +544,9 @@ class Widget:
         self.fam = self.pick_font(["Segoe UI", "DejaVu Sans", "Helvetica Neue", "Helvetica"])
         self.mono = self.pick_font(["Consolas", "DejaVu Sans Mono", "Menlo", "Courier"])
 
-        self.refresh()
-        root.after(POLL * 1000, self.poll)
+        self._next_fetch, self._backoff, self._fetching = 0.0, 0, False
+        self._stamp, self._last_sync = cs.session_stamp(), time.time()
+        self.sync()
         if not demo:
             root.after(5000, self.auto_update)
         self.tick()
@@ -862,17 +884,50 @@ class Widget:
             self.v_start.set(cs.autostart_enabled())
 
     def refresh(self):
-        if self.demo:
+        """Fetch now (menu, or something worth checking right away)."""
+        if self.demo or self._fetching:
             return
-        threading.Thread(target=fetch, args=(self.st,), daemon=True).start()
+        self._fetching = True
 
-    def poll(self):
-        self.refresh()
-        wait = POLL
-        left = self.st.retry_at - time.time()
-        if left > 0:
-            wait = min(int(left) + 5, 900)
-        self.root.after(wait * 1000, self.poll)
+        def work():
+            try:
+                self._after_fetch(fetch(self.st))
+            finally:
+                self._fetching = False
+        threading.Thread(target=work, daemon=True).start()
+
+    def _after_fetch(self, outcome):
+        now = time.time()
+        if outcome == "offline":                # e.g. right after boot: retry soon, then back off
+            self._backoff = min(self._backoff + 1, 6)
+            self._next_fetch = now + min(5 * 2 ** (self._backoff - 1), POLL)
+            return
+        self._backoff = 0
+        if outcome in ("expired", "auth"):      # wait for Claude Code to renew the session
+            self._next_fetch = now + 60
+        elif outcome == "rate":
+            self._next_fetch = self.st.retry_at
+        elif outcome == "skip":                 # still fresh, or still rate limited
+            self._next_fetch = max(self.st.retry_at, self.st.updated + POLL)
+        else:
+            self._next_fetch = now + POLL
+
+    def sync(self):
+        """Runs every 2 s without touching the network unless a request is due."""
+        if not self.demo:
+            now = time.time()
+            if now - self._last_sync > 30:       # woke up from suspend
+                self._next_fetch = 0.0
+                self.st.updated = 0.0
+            self._last_sync = now
+            stamp = cs.session_stamp()
+            if stamp != self._stamp:            # Claude Code renewed its session
+                self._stamp = stamp
+                if self.st.error:
+                    self._next_fetch, self.st.retry_at = 0.0, 0.0
+            if now >= self._next_fetch:
+                self.refresh()
+        self.root.after(2000, self.sync)
 
     def greet(self):
         """The program was opened again: wave so the user finds us."""
