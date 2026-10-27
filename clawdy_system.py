@@ -298,11 +298,12 @@ def set_autostart(on):
     path = _desktop_file()
     if on:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        exe = "clawdy" if MAIN.startswith("/usr/lib/clawdy/") else \
-            " ".join('"%s"' % c if " " in c else c for c in cmd)
+        packaged = MAIN.startswith("/usr/lib/clawdy/")
+        exe = "clawdy" if packaged else " ".join('"%s"' % c if " " in c else c for c in cmd)
+        icon = "clawdy" if packaged else resource("assets", "icon.png")
         open(path, "w").write(
-            "[Desktop Entry]\nType=Application\nName=%s\nComment=%s\nExec=%s\nIcon=clawdy\n"
-            "X-GNOME-Autostart-Delay=10\n" % (APP, t("system.desktop_comment"), exe))
+            "[Desktop Entry]\nType=Application\nName=%s\nComment=%s\nExec=%s\nIcon=%s\n"
+            "X-GNOME-Autostart-Delay=10\n" % (APP, t("system.desktop_comment"), exe, icon))
     elif os.path.exists(path):
         os.remove(path)
 

@@ -14,6 +14,7 @@ All notable changes to Clawdy are listed here. Versions follow
   isn't set up, so the only step left is clicking Authorize in the browser.
 - Installing from source on Linux now adds Clawdy to the applications menu, so
   you can find and reopen it after quitting.
+- New app icon: Clawdy inside its usage rings on a dark rounded tile.
 
 ## 1.2.0
 

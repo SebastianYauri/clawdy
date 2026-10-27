@@ -32,8 +32,9 @@ def add_to_menu(main_py):
     with open(MENU, "w") as f:
         f.write("[Desktop Entry]\nType=Application\nName=Clawdy\nGenericName=Claude usage\n"
                 "Comment=Your Claude usage, with an animated buddy\n"
-                "Exec=%s %s\nIcon=clawdy\nTerminal=false\nCategories=Utility;\n"
-                "Keywords=claude;clawd;usage;uso;\n" % (sys.executable, main_py))
+                "Exec=%s %s\nIcon=%s\nTerminal=false\nCategories=Utility;\n"
+                "Keywords=claude;clawd;usage;uso;\n"
+                % (sys.executable, main_py, os.path.join(DEST, "assets", "icon.png")))
     subprocess.call(["update-desktop-database", os.path.dirname(MENU)],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) if shutil.which("update-desktop-database") else None
 
