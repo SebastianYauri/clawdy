@@ -12,6 +12,8 @@ All notable changes to Clawdy are listed here. Versions follow
   commands. When Claude Code is installed but signed out, the click just signs in.
 - The welcome screen offers to connect your usage right away when Claude Code
   isn't set up, so the only step left is clicking Authorize in the browser.
+- Installing from source on Linux now adds Clawdy to the applications menu, so
+  you can find and reopen it after quitting.
 
 ## 1.2.0
 

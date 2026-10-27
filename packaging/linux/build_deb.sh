@@ -38,7 +38,7 @@ Comment[es]=Tu uso de Claude, con un compañero animado
 Exec=clawdy
 Icon=clawdy
 Terminal=false
-Categories=Utility;Development;
+Categories=Utility;
 Keywords=claude;clawd;usage;uso;
 DESK
 
