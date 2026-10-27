@@ -136,7 +136,7 @@ def draw_mascot(img, cx, cy, px):
                 img.rect(x0 + c * px, y0 + r * px, px, px, EYE if ch == "E" else ORANGE)
 
 
-def make_card(rows, title):
+def make_card(rows, title, footer=LINK):
     """rows: [(label, percent, rgb 0-1, reset text)]. Returns PNG bytes."""
     img = Image(W, H, BG)
     img.rect(0, 0, W, 12, ORANGE)                       # top stripe
@@ -169,7 +169,7 @@ def make_card(rows, title):
             draw_text(img, x, bar_y + 26, reset, 2, DIM)
         y += step
     draw_text(img, 30, 590, "CLAWDY", 4, ORANGE)
-    draw_text(img, 1170, 598, LINK, 2, DIM, "right")
+    draw_text(img, 1170, 598, footer, 2, DIM, "right")
     return img.png()
 
 

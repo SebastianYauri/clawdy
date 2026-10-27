@@ -1175,7 +1175,7 @@ class Widget:
 
         def work():
             try:
-                path = clawdy_share.save_card(clawdy_share.make_card(rows, tr("share.title")))
+                path = clawdy_share.save_card(clawdy_share.make_card(rows, tr("share.title"), tr("share.footer", link=clawdy_share.LINK)))
             except Exception as e:
                 self.root.after(0, lambda: self.flash(tr("share.failed", e=str(e)[:40])))
                 return
