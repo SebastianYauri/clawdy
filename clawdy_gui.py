@@ -45,6 +45,8 @@ VARIANTS = {"thinking": ("bubble", "bulb", "pace"), "typing": ("laptop", "coffee
             "happy": ("confetti", "dance", "fireworks")}
 VARIANT_SECS = 7.0
 NAP_AFTER = 15 * 60                # no Claude Code activity for this long: take a nap
+# Intro once fresh usage arrives: walk in carrying a ball, throw it down, rings fill up.
+INTRO_WALK, INTRO_WIND, INTRO_FILL, INTRO_END = 1.4, 0.35, 0.9, 4.2
 PLUS = (93, 11)                     # new chat button, in the free corner
 PLUS_R = 9
 INFO_Y = H - 7                      # bottom line: names, or what's going on
@@ -488,6 +490,9 @@ class Widget:
         self._placed, self._skey, self._pkey = False, None, None
         self._ring_img, self._ring_key = None, None
         self._smooth = {}
+        self.ready = False                      # no fresh usage yet: the widget waits empty
+        self.intro_t0 = self.fill_t0 = None
+        self.ball = None
         self.panel_out, self._ppos, self._palpha = False, None, None
         self.upd_state, self.upd_info, self.upd_msg, self.upd_msg_until = None, None, None, 0.0
         self.upd_quit = False
@@ -898,6 +903,8 @@ class Widget:
 
     def _after_fetch(self, outcome):
         now = time.time()
+        if not self.ready and self.st.data and not self.st.error and self.st.fresh():
+            self.start_intro()
         if outcome == "offline":                # e.g. right after boot: retry soon, then back off
             self._backoff = min(self._backoff + 1, 6)
             self._next_fetch = now + min(5 * 2 ** (self._backoff - 1), POLL)
@@ -912,8 +919,23 @@ class Widget:
         else:
             self._next_fetch = now + POLL
 
+    def start_intro(self):
+        self.ready, self.intro_t0, self.fill_t0, self.ball = True, time.time(), None, None
+
+    def fill(self):
+        """0 → 1 while the rings fill up after the ball lands."""
+        if not self.ready:
+            return 0.0
+        if self.intro_t0 is None:
+            return 1.0
+        if self.fill_t0 is None:
+            return 0.0
+        return ease(clamp((time.time() - self.fill_t0) / INTRO_FILL))
+
     def sync(self):
         """Runs every 2 s without touching the network unless a request is due."""
+        if self.demo and not self.ready and time.time() - self.t0 > 1.5:
+            self.start_intro()
         if not self.demo:
             now = time.time()
             if now - self._last_sync > 30:       # woke up from suspend
@@ -1002,6 +1024,16 @@ class Widget:
         dt = min(now - self._last, 0.1)
         self._last = now
 
+        if not self.ready:                     # waiting for usage: just a quiet loading pulse
+            for i in range(3):
+                a = 0.25 + 0.6 * max(0.0, math.sin(t * 4 - i * 0.8))
+                self.oval(cx - 14 + i * 14, by - 24, 4, 4, hx(DIM, a))
+            return
+        if self.intro_t0 is not None:
+            if self.draw_intro(cx, by, now - self.intro_t0, dt, t):
+                return
+            self.intro_t0 = None
+            self.act_t, self.force = 0.0, "wave"
         if self.demo:
             self.work = DEMO_STATES[int(t / 3.0) % len(DEMO_STATES)]
         elif now - self._act_read > 0.25:
@@ -1444,6 +1476,85 @@ class Widget:
         self._center = (bx, by + dy - SH / 2)
         self.draw_parts(dt, t)
 
+    def draw_intro(self, cx, by, it, dt, t):
+        """Clawdy walks in with a ball, throws it on the floor and the rings fill up.
+        Returns False once the intro is over."""
+        if it > INTRO_END:
+            return False
+        costume = self.costume()
+        sx = sy = 1.0
+        dy = rot = 0.0
+        arm_l = arm_r = -9.0
+        eye, step, tuck = "open", None, False
+        throw_at = INTRO_WALK + INTRO_WIND
+        if it < INTRO_WALK:                                  # walk in from the left
+            k = it / INTRO_WALK
+            self.pos = lerp(-58, 0, 1 - (1 - k) ** 2)
+            self.dir = 1
+            step = int(t * 12 / math.pi) % 2
+            dy = -abs(math.sin(t * 12)) * 2.5
+        elif it < throw_at:                                  # wind up
+            self.pos = 0.0
+            q = (it - INTRO_WALK) / INTRO_WIND
+            sy, sx = 1 - 0.12 * q, 1 + 0.06 * q
+            arm_l = arm_r = -9 - 3 * q
+        else:                                                # thrown: arms down, happy
+            self.pos = 0.0
+            q = min(1.0, (it - throw_at) / 0.15)
+            arm_l = arm_r = lerp(-12, 2, q)
+            sy = 1 + 0.06 * math.sin(min(1.0, (it - throw_at) / 0.3) * math.pi)
+            eye = "happy" if self.fill_t0 else "open"
+        bx = cx + self.pos
+        self.oval(bx, by + 3, SW / 2, 3.5, hx((0, 0, 0), 0.35))
+        xf = Xform(bx, by + dy - SH / 2 * sy, sx, sy, rot)
+        self.draw_costume(xf, costume, "back", t, 0.6, eye, 0)
+        self.draw_sprite(xf, arm_l, arm_r, eye, 0, -1, step, tuck)
+        self.draw_costume(xf, costume, "front", t, 0.6, eye, 0)
+        top_y = by + dy - SH * sy
+        hat = (-HAT_TOP.get(costume, -27) - 27) * 0.8
+        R = 11
+        if it < throw_at:                                    # carried above the head
+            self.ball = None
+            self.draw_ball(bx, top_y - hat - R - 2 + (3 * (it - INTRO_WALK) / INTRO_WIND if it > INTRO_WALK else 0), R, t)
+        else:
+            b = self.ball
+            if b is None:
+                b = self.ball = {"x": bx, "y": top_y - hat - R - 2, "vx": 60.0, "vy": 120.0, "hits": 0, "spin": 0.0}
+            b["vy"] += 900 * dt
+            b["x"] += b["vx"] * dt
+            b["y"] += b["vy"] * dt
+            b["spin"] += b["vx"] * dt / R
+            if b["y"] > by - R and b["vy"] > 0:              # bounce on the floor
+                b["y"] = by - R
+                b["vy"] *= -0.55
+                b["vx"] *= 0.92
+                b["hits"] += 1
+                if b["hits"] == 1:
+                    self.fill_t0 = time.time()
+                    for i in range(9):
+                        a = math.pi + i * math.pi / 8
+                        self.spawn("spark", b["x"], by - 2, math.cos(a) * 80, math.sin(a) * 60, 0.6)
+                if abs(b["vy"]) < 40:
+                    b["vy"] = 0.0
+            fade = clamp((INTRO_END - it) / 0.25)      # it rolls out behind the rings
+            self.draw_ball(b["x"], b["y"], R, b["spin"], fade)
+        self._center = (bx, by - SH / 2)
+        self.draw_parts(dt, t)
+        return True
+
+    def draw_ball(self, x, y, r, spin, a=1.0):
+        """A beach ball in the usage colors."""
+        cols = [(0.45, 0.78, 0.45), (0.95, 0.70, 0.25), (0.90, 0.30, 0.25)]
+        self.oval(x, y, r, r, hx((0.97, 0.95, 0.92), a))
+        bf = Xform(x, y, 1, 1, spin)
+        for i, col in enumerate(cols):
+            a0 = i * 2 * math.pi / 3
+            pts = [bf.pt(0, 0)] + [bf.pt(math.cos(a0 + j * 0.35) * r * 0.95, math.sin(a0 + j * 0.35) * r * 0.95)
+                                   for j in range(4)]
+            self.poly(pts, hx(col, a))
+        self.oval(x, y, 2.5, 2.5, hx((0.97, 0.95, 0.92), a))
+        self.oval(x - r * 0.4, y - r * 0.45, 2.5, 2, hx((1, 1, 1), 0.8 * a))
+
     def draw_sprite(self, xf, arm_l, arm_r, eye, eye_dx, eye_dy, step, tuck):
         orange, orange_d, dark = hx(ORANGE), hx(ORANGE_D), hx(DARK)
         x0, y0 = -SW / 2, -SH / 2
@@ -1839,6 +1950,13 @@ class Widget:
     def draw(self):
         st = self.st
         rows = bars(st.data) if st.data else []
+        tracks = len(rows[:len(RING_RS)]) or 2
+        f = self.fill()
+        if f <= 0:
+            rows = []                       # no fresh usage yet: empty rings, no numbers
+        elif f < 1:
+            q = round(f * 14) / 14          # a few steps: each one re-renders the rings
+            rows = [(n, p * q, r) for n, p, r in rows]
         near = bool(self.mouse and self.on_plus(*self.mouse))
         key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, st.error,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
@@ -1850,7 +1968,7 @@ class Widget:
             self.card(CW)
             self.layer(mark, "bg")
             mark = self.canvas.create_line(0, 0, 0, 0)
-            self.draw_rings(0, rows)
+            self.draw_rings(0, rows, tracks)
             self.draw_column(0, rows, near)
             self.layer(mark, "static")
             self.canvas.tag_lower("bg")
@@ -1910,13 +2028,15 @@ class Widget:
         finally:
             self.canvas = main
 
-    def draw_rings(self, cx, rows):
-        pcts = tuple(round(p) for _, p, _ in rows[:len(RING_RS)]) or (None, None)
+    def draw_rings(self, cx, rows, tracks=2):
+        pcts = tuple(round(p) for _, p, _ in rows[:len(RING_RS)]) or (None,) * tracks
         if (pcts, self.k) != self._ring_key:
             self._ring_key = (pcts, self.k)
             self._ring_img = self.ring_image(pcts)
         # the image is already at screen resolution: place it by its center
         self.canvas.create_image(cx + RING_C[0], RING_C[1], image=self._ring_img)
+        for x in (cx, cx + CW - 2):            # the image stops ~1 px short of the card edges
+            self.rect(x, 16, 2, RING_C[1] + RING_RS[0] - 16, hx(CARD))
 
     def ring_image(self, pcts):
         """Antialiased rings with round caps, rasterized by hand (Tk can't).
