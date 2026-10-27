@@ -965,6 +965,20 @@ class Widget:
             self.popup_menu.close()
         self.popup_menu = PopupMenu(self, ev.x_root, ev.y_root)
 
+    def open_settings(self):
+        """The right-click menu, opened from the tray: next to Clawdy, or at the pointer when hidden."""
+        if self.popup_menu:
+            self.popup_menu.close()
+        if self.hidden:
+            x, y = self.root.winfo_pointerxy()
+        else:
+            mw = round(PopupMenu.MW * self.k)
+            x = self.root.winfo_rootx() - mw - 8
+            if x < 4:
+                x = self.root.winfo_rootx() + self.root.winfo_width() + 8
+            y = self.root.winfo_rooty()
+        self.popup_menu = PopupMenu(self, x, y)
+
     def toggle_hooks(self):
         err = cs.set_hooks(self.v_hooks.get())
         if err:
