@@ -11,6 +11,14 @@ session that Claude Code already keeps on your computer:
 | Windows, Linux | `~/.claude/.credentials.json` |
 | macOS | the login Keychain, item *Claude Code-credentials* |
 
+Only Claude Code's session can be read: the Claude desktop app keeps its own
+session encrypted, and Clawdy doesn't try to get at it. Without Claude Code,
+Clawdy keeps working with empty rings and **Click to see your usage**; the click
+opens a terminal running the official installer
+(`curl -fsSL https://claude.ai/install.sh | bash`, or `irm https://claude.ai/install.ps1 | iex`
+on Windows) followed by `claude auth login`. When Claude Code is already
+installed it only runs the sign-in.
+
 This is your Claude subscription session, **not an API key**, so checking your
 usage is free and doesn't count against your plan. Clawdy never writes or
 refreshes the token; if it expires, open Claude Code once and it renews it.

@@ -3,6 +3,13 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.3.0
+
+- Works without Claude Code: with only the Claude desktop app, Clawdy keeps its
+  animations, chat button and walks, with empty rings and a **Click to see your
+  usage** prompt that installs Claude Code and signs you in, in a terminal you
+  can see. When Claude Code is installed but signed out, the click just signs in.
+
 ## 1.2.0
 
 - Desktop walks: while you're using Claude Code or the Claude app, now and

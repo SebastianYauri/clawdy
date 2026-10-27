@@ -69,9 +69,12 @@ Get the file for your computer from the
 | **Ubuntu, Debian, Mint** | `clawdy_…_all.deb` | Double-click it → **Install**, or `sudo apt install ./clawdy_*_all.deb`. |
 | **Mac (Apple silicon)** | `Clawdy-mac.dmg` | Open it and drag *Clawdy* into *Applications*. |
 
-You need [Claude Code](https://claude.com/claude-code) installed and signed in.
-The first time Clawdy opens it explains what it does and asks before connecting
-to Claude Code or starting at login.
+Clawdy reads your usage from [Claude Code](https://claude.com/claude-code). Only
+have the Claude desktop app? Clawdy still works (mascot, chat button, walks), and
+clicking **Click to see your usage** opens a terminal that installs Claude Code
+with the official installer and signs you in. The first time Clawdy opens it
+explains what it does and asks before connecting to Claude Code or starting at
+login.
 
 > [!NOTE]
 > **Edge blocks the download?** New apps aren't "commonly downloaded" yet. Open

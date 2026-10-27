@@ -234,6 +234,7 @@ class State:
         self.error = None
         self.updated = 0.0
         self.retry_at = 0.0
+        self.need = None                    # "install" / "login" / "renew": Claude Code isn't ready
         self.load()
 
     def load(self):
@@ -265,14 +266,14 @@ def fetch(st):
     try:
         tok, expires = cs.read_session()
         if expires and expires < time.time() + 20:
-            st.error = tr("error.renew")       # don't spend a request on a dead token
+            st.error, st.need = tr("error.renew"), "renew"   # don't spend a request on a dead token
             return "expired"
         req = urllib.request.Request(URL, headers={
             "Authorization": "Bearer " + tok,
             "anthropic-beta": "oauth-2025-04-20",
             "User-Agent": "clawdy/" + VERSION})
         st.data = json.loads(urllib.request.urlopen(req, timeout=20).read())
-        st.error, st.updated, st.retry_at = None, time.time(), 0
+        st.error, st.updated, st.retry_at, st.need = None, time.time(), 0, None
         st.save()
         return "ok"
     except urllib.error.HTTPError as e:
@@ -286,11 +287,12 @@ def fetch(st):
             st.save()
             return "rate"
         if e.code == 401:
-            st.error = tr("error.renew")
+            st.error, st.need = tr("error.renew"), "renew"
             return "auth"
         st.error = "HTTP %d" % e.code
     except (FileNotFoundError, KeyError):
-        st.error = tr("error.login")
+        st.need = "login" if cs.claude_code_path() else "install"   # e.g. only the desktop app
+        st.error = tr("need." + st.need)
         return "auth"
     except (urllib.error.URLError, OSError):
         st.error = tr("error.offline")
@@ -786,6 +788,12 @@ class Widget:
             self._drag = False
             self.install_update()
             return
+        if ev.y / self.k > INFO_Y - 9 and self.no_usage():
+            self._drag = False
+            cs.connect_claude_code()
+            self.flash(tr("need.opened"), 60)
+            self._next_fetch = time.time() + 15
+            return
         if self.on_plus(ev.x / self.k, ev.y / self.k):
             self._drag = False
             self.new_chat()
@@ -930,6 +938,10 @@ class Widget:
         else:
             self._next_fetch = now + POLL
 
+    def no_usage(self):
+        """No Claude Code session to read usage from: Clawdy works, the rings stay empty."""
+        return self.st.need in ("install", "login")
+
     def start_intro(self):
         self.ready, self.intro_t0, self.fill_t0, self.ball = True, time.time(), None, None
 
@@ -951,7 +963,7 @@ class Widget:
             self.next_trip = now + 60          # only while you're using Claude
             return
         busy = (self.work in ("notification", "error") or self.hidden or self.e > 0 or self._drag
-                or not self.ready or self.intro_t0 is not None or self.popup_menu)
+                or not (self.ready or self.no_usage()) or self.intro_t0 is not None or self.popup_menu)
         if not force:
             busy = busy or self.col_in or self.panel_in
         if busy:
@@ -1128,7 +1140,7 @@ class Widget:
         dt = min(now - self._last, 0.1)
         self._last = now
 
-        if not self.ready:                     # waiting for usage: just a quiet loading pulse
+        if not self.ready and not self.no_usage():   # waiting for usage: just a quiet loading pulse
             for i in range(3):
                 a = 0.25 + 0.6 * max(0.0, math.sin(t * 4 - i * 0.8))
                 self.oval(cx - 14 + i * 14, by - 24, 4, 4, hx(DIM, a))
@@ -2225,6 +2237,8 @@ class Widget:
             self.text(mid, INFO_Y, upd[0], hx(upd[1]), 5, bold=True, anchor="center")
         elif self.work:
             self.text(mid, INFO_Y, label(self.work, short=True), hx(ORANGE), 6, bold=True, anchor="center")
+        elif not rows and self.no_usage():     # clickable: sets up Claude Code
+            self.text(mid, INFO_Y, tr("need." + self.st.need), hx(ORANGE), 5, bold=True, anchor="center")
         elif not rows:
             self.text(mid, INFO_Y, self.status_msg()[:22], hx(DIM), 5, anchor="center")
         else:

@@ -27,6 +27,9 @@ STRINGS = {
     "error.renew": ("open Claude Code to renew your session", "abre Claude Code para renovar la sesión"),
     "error.login": ("sign in to Claude Code", "inicia sesión en Claude Code"),
     "error.offline": ("no internet connection", "sin conexión a internet"),
+    "need.install": ("Click to see your usage", "Clic para ver tu uso"),
+    "need.login": ("Click to sign in", "Clic para iniciar sesión"),
+    "need.opened": ("finish in the terminal window", "termina en la ventana de terminal"),
 
     "act.thinking": ("Thinking…", "Pensando…"),
     "act.typing": ("Writing code", "Escribiendo código"),
@@ -95,10 +98,10 @@ STRINGS = {
                       "works, I act it out: thinking, typing, hammering…",
                       "Te muestro cuánto llevas usado de Claude. Y mientras Claude Code trabaja, "
                       "yo hago lo mismo que él: pienso, escribo, martillo…"),
-    "welcome.no_login": ("I couldn't find Claude Code on this computer. Install it and sign in, "
-                         "and your usage will show up here.",
-                         "No encontré Claude Code en esta computadora. Instálalo e inicia sesión, "
-                         "y aquí aparecerá tu uso."),
+    "welcome.no_login": ("Your usage comes from Claude Code, which isn't set up here yet (the desktop "
+                         "app alone isn't enough). Once I'm open, click my bottom line and I'll set it up.",
+                         "Tu uso viene de Claude Code, que aún no está configurado aquí (la app de "
+                         "escritorio sola no basta). Cuando me abras, haz clic abajo en mí y lo configuro."),
     "welcome.hooks": ("React to what Claude Code is doing", "Reaccionar a lo que hace Claude Code"),
     "welcome.autostart": ("Open me when the computer starts", "Abrirme al encender la computadora"),
     "welcome.hint": ("You can change this anytime by right-clicking me.",

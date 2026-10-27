@@ -344,6 +344,66 @@ def claude_app_installed():
     return bool(out)
 
 
+INSTALL_SH = "curl -fsSL https://claude.ai/install.sh | bash"
+INSTALL_PS = "irm https://claude.ai/install.ps1 | iex"
+
+
+def claude_code_path():
+    """Where the Claude Code CLI is, or None. GUI apps often get a short PATH, so look around."""
+    found = shutil.which("claude")
+    if found:
+        return found
+    exe = "claude.exe" if WIN else "claude"
+    for d in (os.path.join(HOME, ".local", "bin"), os.path.join(HOME, ".claude", "local"),
+              "/opt/homebrew/bin", "/usr/local/bin", os.path.join(HOME, ".npm-global", "bin"),
+              os.path.join(os.environ.get("APPDATA", ""), "npm")):
+        p = os.path.join(d, exe)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def _terminal(cmd):
+    """Run a shell command in a new, visible terminal window."""
+    if WIN:
+        subprocess.Popen(["powershell", "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", cmd],
+                         creationflags=0x00000010)
+        return True
+    if MAC:
+        script = 'tell application "Terminal" to do script "%s"' % cmd.replace("\\", "\\\\").replace('"', '\\"')
+        subprocess.Popen(["osascript", "-e", script, "-e", 'tell application "Terminal" to activate'])
+        return True
+    run = "%s; echo; read -p 'Press Enter to close…' _" % cmd
+    for term, args in (("ptyxis", ["--new-window", "--", "bash", "-lc", run]),
+                       ("kgx", ["--", "bash", "-lc", run]), ("gnome-terminal", ["--", "bash", "-lc", run]),
+                       ("konsole", ["-e", "bash", "-lc", run]), ("x-terminal-emulator", ["-e", "bash", "-lc", run]),
+                       ("xfce4-terminal", ["-x", "bash", "-lc", run]), ("xterm", ["-e", "bash", "-lc", run])):
+        if shutil.which(term):
+            subprocess.Popen([term] + args, start_new_session=True,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+    return False
+
+
+def connect_claude_code():
+    """Install Claude Code if needed and sign in, in a terminal the user can see.
+    Falls back to the setup page when no terminal can be opened."""
+    path = claude_code_path()
+    if WIN:
+        cmd = ('& "%s" auth login' % path) if path else \
+            '%s; & "$env:USERPROFILE\\.local\\bin\\claude.exe" auth login' % INSTALL_PS
+    else:
+        cmd = ("'%s' auth login" % path) if path else "%s && ~/.local/bin/claude auth login" % INSTALL_SH
+    try:
+        if _terminal(cmd):
+            return True
+    except Exception:
+        pass
+    import webbrowser
+    webbrowser.open("https://docs.claude.com/en/docs/claude-code/setup")
+    return False
+
+
 def claude_running():
     """Is the Claude desktop app or Claude Code running? Cheap enough to call every ~30 s."""
     names = {"claude", "claude-desktop", "claude.exe"}
