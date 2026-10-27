@@ -558,7 +558,7 @@ class Widget:
         self.v_alerts = tk.BooleanVar(value=cs.load_config().get("alerts", True))
         self.v_sounds = tk.BooleanVar(value=cs.load_config().get("sounds", True))
         self._alerts = []                   # filled by the fetch thread, shown on the Tk thread
-        self.alarm_until = 0.0
+        self.alarm_until, self.alarm_text = 0.0, ""
         self.walk, self.away = None, False
         self.setup_phase = None              # installing Claude Code / waiting for the browser
         soon = os.environ.get("CLAWDY_WALK_IN")
@@ -1115,6 +1115,7 @@ class Widget:
                 cs.play_sound("alert")
             self.force, self.act_t = "alarm", 0.0
             self.alarm_until = time.time() + 4.0
+            self.alarm_text = tr("alert.short", name=short_name(name), p=round(p))
 
     def toggle_alerts(self):
         cs.update_config(alerts=self.v_alerts.get())
@@ -2069,7 +2070,7 @@ class Widget:
                     self.oval(bx + math.cos(a) * 36, bt + 2 - abs(math.sin(a)) * 24, 9, 9, hx(col))
             elif pr in ("bang", "err"):
                 col = (0.95, 0.75, 0.20) if pr == "bang" else (0.90, 0.30, 0.25)
-                yb = bt - 26 - abs(math.sin(t * 7)) * 4
+                yb = bt - 26 - abs(math.sin(t * 7)) * 4 - (-HAT_TOP.get(costume, -27) - 27) * 1.1   # above any hat
                 self.oval(bx, yb, 13, 13, hx(col))
                 self.text(bx, yb, "!", dark, 14, bold=True, anchor="center")
             elif pr == "bulb":
@@ -2221,6 +2222,7 @@ class Widget:
             rows = [(n, p * q, r) for n, p, r in rows]
         near = bool(self.mouse and self.on_plus(*self.mouse))
         key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, st.error, self.setup_phase,
+               time.time() < self.alarm_until,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
         if key != self._skey:               # rebuild the static layer only when something changed
             self._skey = key
@@ -2378,6 +2380,8 @@ class Widget:
                       hx(TXT), 6, anchor="center")
         elif upd:
             self.text(mid, INFO_Y, upd[0], hx(upd[1]), 5, bold=True, anchor="center")
+        elif time.time() < self.alarm_until:     # a limit alert is on
+            self.text(mid, INFO_Y, self.alarm_text, hx((0.95, 0.40, 0.35)), 6, bold=True, anchor="center")
         elif self.work:
             self.text(mid, INFO_Y, label(self.work, short=True), hx(ORANGE), 6, bold=True, anchor="center")
         elif not rows and self.setup_phase:

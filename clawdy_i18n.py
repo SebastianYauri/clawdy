@@ -91,6 +91,7 @@ STRINGS = {
     "alert.title": ("{name} at {p}%", "{name} al {p} %"),
     "alert.body": ("Claude usage · resets in {t}", "Uso de Claude · se reinicia en {t}"),
     "alert.body_nr": ("Claude usage", "Uso de Claude"),
+    "alert.short": ("{name} at {p}%!", "¡{name} al {p} %!"),
     "sessions.title": ("Claude Code", "Claude Code"),
     "sessions.open": ("Open now", "Abiertas ahora"),
     "sessions.recent": ("Recent chats", "Chats recientes"),

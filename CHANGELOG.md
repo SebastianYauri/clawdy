@@ -10,6 +10,7 @@ All notable changes to Clawdy are listed here. Versions follow
   off from the right-click menu.
 - 8-bit alert sound (bip-bip-biiip) with the alerts; mute it with **Sounds**
   in the menu.
+- During an alert the bottom line reads, for example, **5h at 82%!** in red.
 
 ## 1.3.1
 
