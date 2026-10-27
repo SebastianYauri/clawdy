@@ -58,6 +58,8 @@ ASK_GAP = 20                        # one "Claude needs you" per session within 
 INTRO_WALK, INTRO_WIND, INTRO_FILL, INTRO_END = 1.4, 0.35, 0.9, 4.2
 PLUS = (93, 11)                     # new chat button, in the free corner
 PLUS_R = 9
+PIN = (11, 11)                      # pin in place, in the other free corner
+PIN_R = 8
 INFO_Y = H - 7                      # bottom line: names, or what's going on
 SIZES = ((0.8, "size.small"), (1.0, "size.normal"), (1.3, "size.large"))
 OPEN_AFTER, CLOSE_AFTER, SPEED = 0.25, 0.4, 3.2    # s, s, views/s
@@ -573,6 +575,8 @@ class Widget:
         self._marks, self._asked = None, {}
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.held = False                    # being carried around with the mouse
+        self.v_lock = tk.BooleanVar(value=bool(cs.load_config().get("locked", False)))
+        self.pin_hover, self.pin_click = 0.0, -10.0
         self._vel, self._last_drag = (0.0, 0.0), None
         self._shakes, self._shake_dir = [], 0
         self.dizzy_until = self.land_until = 0.0
@@ -805,6 +809,18 @@ class Widget:
         x, y, r = self.plus_at()
         return math.hypot(mx - x, my - y) < r + 3
 
+    def on_pin(self, mx, my):
+        return math.hypot(mx - PIN[0], my - PIN[1]) < PIN_R + 3
+
+    def toggle_lock(self, flip=True):
+        """Pin Clawdy in place: dragging no longer moves it (clicks still work)."""
+        if flip:
+            self.v_lock.set(not self.v_lock.get())
+        cs.update_config(locked=self.v_lock.get())
+        self.pin_click = time.time()
+        self.note_until, self.note_color = time.time() + 1.6, ORANGE
+        self.note_text = tr("pin.on" if self.v_lock.get() else "pin.off")
+
     def press(self, ev):
         if self.popup_menu:
             self.popup_menu.close()
@@ -820,13 +836,18 @@ class Widget:
             self._drag = False
             self.new_chat()
             return
+        if self.on_pin(ev.x / self.k, ev.y / self.k):
+            self._drag = False
+            self._press = None
+            self.toggle_lock()
+            return
         self.press_panel(ev)
 
     def press_panel(self, ev):
         if self.popup_menu:
             self.popup_menu.close()
         self._press = (ev.x_root, ev.y_root, time.time())
-        self._drag = True
+        self._drag = not self.v_lock.get()       # pinned: clicks work, dragging doesn't move it
         self._dx, self._dy = ev.x_root - self.root.winfo_x(), ev.y_root - self.root.winfo_y()
 
     def toggle_pin(self):
@@ -849,7 +870,8 @@ class Widget:
         if not (self.col_in or now - self.left_at < 0.15):
             self.mouse = None
         # Hovering the + while compact doesn't expand, so the button doesn't run away.
-        over_plus = self.e < 0.5 and self.mouse is not None and self.on_plus(*self.mouse)
+        over_plus = self.e < 0.5 and self.mouse is not None and (self.on_plus(*self.mouse)
+                                                                 or self.on_pin(*self.mouse))
         hot = inside and not over_plus
         if hot:
             self.out_since, self.in_since = None, self.in_since or now
@@ -1005,6 +1027,7 @@ class Widget:
             ("toggle", tr("menu.hooks"), w.v_hooks, w.toggle_hooks),
             ("toggle", tr("menu.autostart"), w.v_start, w.toggle_start),
             ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
+            ("toggle", tr("menu.lock"), w.v_lock, lambda: w.toggle_lock(flip=False)),
             ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
             ("toggle", tr("menu.alerts"), w.v_alerts, w.toggle_alerts),
             ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
@@ -2413,7 +2436,8 @@ class Widget:
             q = round(f * 14) / 14          # a few steps: each one re-renders the rings
             rows = [(n, p * q, r) for n, p, r in rows]
         near = bool(self.mouse and self.on_plus(*self.mouse))
-        key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, st.error, self.setup_phase,
+        self.near_pin = bool(self.mouse and self.on_pin(*self.mouse))
+        key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, self.near_pin, st.error, self.setup_phase,
                time.time() < self.alarm_until, time.time() < self.note_until and self.note_text,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
         if key != self._skey:               # rebuild the static layer only when something changed
@@ -2436,6 +2460,7 @@ class Widget:
         self.draw_scene(top, SCENE_K, RING_C[0], RING_C[1] + drop)
         pmark = self.canvas.create_line(0, 0, 0, 0)
         self.plus()
+        self.pin()
         for item in self.canvas.find_all():
             if item > pmark:
                 self.canvas.addtag_withtag("plus", item)
@@ -2570,6 +2595,9 @@ class Widget:
         if near:
             self.text(mid, INFO_Y, tr("chat.app") if self.has_app else tr("chat.web"),
                       hx(TXT), 6, anchor="center")
+        elif getattr(self, "near_pin", False):
+            self.text(mid, INFO_Y, tr("pin.hint_off" if self.v_lock.get() else "pin.hint_on"),
+                      hx(TXT), 6, anchor="center")
         elif upd:
             self.text(mid, INFO_Y, upd[0], hx(upd[1]), 5, bold=True, anchor="center")
         elif time.time() < self.alarm_until:     # a limit alert is on
@@ -2680,6 +2708,40 @@ class Widget:
         key = ("btn", round(rad * self.k * 4), round(hv * 12), round(spin % 90 / 3) % 30)
         img = self.smooth_image(key, lambda: self.button_pixels(rad, hv, spin))
         self.canvas.create_image(x, y, image=img)
+
+    def pin(self):
+        """Pin button: just the icon. Tilted and dim when free, upright and orange when pinned."""
+        near = bool(self.mouse and self.on_pin(*self.mouse))
+        self.pin_hover += ((1.0 if near else 0.0) - self.pin_hover) * 0.25
+        hv = ease(clamp(self.pin_hover))
+        on = self.v_lock.get()
+        since = time.time() - self.pin_click
+        pop = math.sin(math.pi * min(since / 0.25, 1.0)) if since < 0.25 else 0.0
+        key = ("pin", on, round(hv * 8), round(pop * 6))
+        img = self.smooth_image(key, lambda: self.pin_pixels(on, hv, pop))
+        self.canvas.create_image(PIN[0], PIN[1], image=img)
+
+    def pin_pixels(self, on, hv, pop):
+        k = self.k * (1 + 0.15 * hv + 0.2 * pop)
+        col = ORANGE if on else tuple(lerp(a, b, hv) for a, b in zip(DIM, TXT))
+        alpha = 1.0 if on else 0.55 + 0.45 * hv
+        ang = 0.0 if on else math.radians(40)
+        ca, sa = math.cos(ang), math.sin(ang)
+
+        def capsule(x, y, ax, ay, bx, by, r):
+            vx, vy = bx - ax, by - ay
+            t = clamp(((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy or 1))
+            return clamp(r + 0.5 - math.hypot(x - ax - vx * t, y - ay - vy * t))
+
+        def pixel(dx, dy):
+            x, y = dx * ca + dy * sa, -dx * sa + dy * ca                 # pin space, y down
+            u = k
+            c = max(capsule(x, y, -2.6 * u, -4.6 * u, 2.6 * u, -4.6 * u, 1.5 * u),   # head
+                    capsule(x, y, 0, -4.2 * u, 0, -0.8 * u, 1.7 * u),               # body
+                    capsule(x, y, -3.6 * u, -0.3 * u, 3.6 * u, -0.3 * u, 1.0 * u),  # collar
+                    capsule(x, y, 0, 0, 0, 5.2 * u, 0.5 * u))                       # needle
+            return col, c * alpha
+        return int(math.ceil(14 * k)) | 1, pixel
 
     def halo(self, x, y, rr, half, col, a):
         key = ("halo", round(rr * self.k * 2), round(half * 4), round(a * 20), col)
