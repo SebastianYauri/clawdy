@@ -115,17 +115,44 @@ def draw_text(img, x, y, text, scale, color, align="left"):
         x += 6 * scale
 
 
-def draw_ring(img, cx, cy, radius, width, p, color, cell=6):
-    """A chunky pixel ring, filled clockwise from the top up to p percent."""
-    r0, r1 = radius - width / 2, radius + width / 2
-    n = int(r1 // cell) + 1
-    for j in range(-n, n + 1):
-        for i in range(-n, n + 1):
-            dx, dy = (i + 0.5) * cell, (j + 0.5) * cell
+def draw_rings(img, cx, cy, rings, width, bg):
+    """Smooth rings (anti-aliased, round caps), each filled clockwise from the top.
+    rings: [(radius, percent, rgb)]."""
+    half = width / 2
+    outer = max(r for r, _, _ in rings) + half + 2
+    ends = []
+    for r, p, col in rings:
+        a = 2 * math.pi * max(0.0, min(100.0, p)) / 100
+        ends.append(((r * math.sin(a), -r * math.cos(a)), (0.0, -r)))
+    for y in range(int(cy - outer), int(cy + outer) + 1):
+        if not 0 <= y < img.h:
+            continue
+        dy = y + 0.5 - cy
+        row = y * img.w
+        for x in range(int(cx - outer), int(cx + outer) + 1):
+            dx = x + 0.5 - cx
             d = math.hypot(dx, dy)
-            if r0 <= d <= r1:
-                frac = (math.atan2(dx, -dy) % (2 * math.pi)) / (2 * math.pi)
-                img.rect(cx + i * cell, cy + j * cell, cell, cell, color if frac * 100 < p else TRACK)
+            if d > outer:
+                continue
+            frac = (math.atan2(dx, -dy) % (2 * math.pi)) / (2 * math.pi)
+            for (r, p, col), (end, start) in zip(rings, ends):
+                cover = half + 0.5 - abs(d - r)
+                if cover <= 0:
+                    continue
+                cover = min(1.0, cover)
+                filled = p > 0 and (frac * 100 < p or p >= 100)
+                if p > 0 and not filled:                 # round caps at both ends of the arc
+                    for ex, ey in (end, start):
+                        c = half + 0.5 - math.hypot(dx - ex, dy - ey)
+                        if c > 0:
+                            filled = True
+                            cover = min(cover, 1.0) if c >= 1 else max(c, 0.0)
+                            break
+                col = col if filled else TRACK
+                i = (row + x) * 3
+                base = img.px[i:i + 3]
+                img.px[i:i + 3] = bytes(round(b + (c - b) * cover) for b, c in zip(base, col))
+                break
 
 
 def draw_mascot(img, cx, cy, px):
@@ -142,11 +169,10 @@ def make_card(rows, title, footer=LINK):
     img.rect(0, 0, W, 12, ORANGE)                       # top stripe
     cx, cy = 300, 306
     img.rect(cx - 270, cy - 270, 540, 540, PANEL)
-    radii = (246, 210, 174)
-    for (label, p, col, _), rad in zip(rows, radii):
-        draw_ring(img, cx, cy, rad, 24, p, tuple(round(v * 255) for v in col))
-    for rad in radii[len(rows):]:
-        draw_ring(img, cx, cy, rad, 24, 0, TRACK)
+    radii = (240, 204, 168)
+    rings = [(rad, p, tuple(round(v * 255) for v in col)) for (_, p, col, _), rad in zip(rows, radii)]
+    rings += [(rad, 0, TRACK) for rad in radii[len(rows):]]
+    draw_rings(img, cx, cy, rings, 24, PANEL)
     draw_mascot(img, cx, cy, 18)
 
     x, right = 620, 1150
