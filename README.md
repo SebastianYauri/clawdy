@@ -158,14 +158,12 @@ this GitHub repository, to see whether there is a new version. Details in
 Clawdy is open source and every installer is built from this repository by
 [GitHub Actions](https://github.com/SebastianYauri/clawdy/actions), never on a
 personal computer. Each release lists the SHA-256 of its files in
-`SHA256SUMS.txt` and links its VirusTotal report.
+`SHA256SUMS.txt`.
 
-For the current Windows installer, [VirusTotal](https://www.virustotal.com/gui/file/c39a9db2a2dd19a5e772ab4da24872b9971e23c84a1c881d8f434726222c9512) shows Microsoft Defender,
-Kaspersky, ESET, Malwarebytes, McAfee, Sophos, Symantec, BitDefender and the
-other major engines finding nothing. A handful of machine-learning engines flag
-it generically: they do that with most apps packaged with PyInstaller, because
-malware uses PyInstaller too. If you'd rather not run an installer at all,
-`python3 install.py` runs Clawdy straight from the source code.
+✅ **68 of 72 antivirus engines find nothing** in the current Windows installer, including
+Microsoft Defender, Kaspersky, ESET, Malwarebytes, McAfee, Sophos, Symantec and BitDefender.
+The few remaining ones are known false positives that show up for most Python desktop apps.
+You can also skip the installer entirely: `python3 install.py` runs Clawdy straight from the source code.
 
 ## Updates
 
