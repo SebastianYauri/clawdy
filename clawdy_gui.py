@@ -2672,6 +2672,9 @@ def round_rect(canvas, x1, y1, x2, y2, r, **kw):
     return canvas.create_polygon(pts, smooth=True, **kw)
 
 
+GRACE = 3.0                            # seconds a menu waits for the mouse before closing by itself
+
+
 class PopupMenu:
     """Right-click menu in Clawdy's style: dark and rounded, with switches and
     pills instead of checkboxes and submenus."""
@@ -2681,7 +2684,9 @@ class PopupMenu:
 
     def __init__(self, w, x_root, y_root, items=None, width=None):
         self.w, self.k = w, w.k
-        self.hover, self.left_at, self.closed = None, None, False
+        self.hover, self.closed = None, False
+        self.opened = time.time()
+        self.left_at = self.opened + GRACE      # never reached by the mouse (e.g. opened from the tray): close soon
         if width:
             self.MW = width
         self.items = items or [
@@ -2869,7 +2874,7 @@ class PopupMenu:
             focus = self.win.focus_get()
         except (tk.TclError, KeyError):
             focus = None
-        if focus is None and self.left_at:
+        if focus is None and time.time() - self.opened > 0.4:   # clicked somewhere else
             self.close()
 
     def close(self):

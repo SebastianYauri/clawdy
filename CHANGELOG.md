@@ -3,6 +3,12 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.2
+
+- Menus close by themselves: if the mouse never reaches one (for example
+  Settings opened from the tray), it closes after a few seconds, and clicking
+  anywhere else closes it right away.
+
 ## 1.4.1
 
 - **"Claude finished" / "Claude needs you" notifications.** When a Claude Code
