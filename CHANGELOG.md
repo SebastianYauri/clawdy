@@ -3,6 +3,14 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.3.1
+
+- Windows build goes back to PyInstaller's stock bootloader. The self-compiled
+  one in 1.3.0 made Microsoft Defender's machine-learning engine flag the
+  installer as a false positive, so 1.3.0 was pulled back to a pre-release.
+- New releases are published as pre-releases first and promoted after a
+  VirusTotal check.
+
 ## 1.3.0
 
 - Works without Claude Code: with only the Claude desktop app, Clawdy keeps its
