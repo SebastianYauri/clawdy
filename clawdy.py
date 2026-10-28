@@ -21,6 +21,8 @@ if sys.platform.startswith("linux"):
 
 def read_stdin(timeout):
     """All of stdin, or whatever arrived within `timeout` seconds (never hang agy's bar)."""
+    if sys.stdin is None:
+        return ""
     if sys.platform == "win32":
         return sys.stdin.read()
     import select
@@ -51,7 +53,8 @@ def main(argv):
             line = clawdy_agy.statusline(json.loads(raw) if raw.strip() else {})
         except Exception:
             pass
-        sys.stdout.write((line or "Clawdy") + "\n")
+        if sys.stdout:                       # a windowed build may have no stdout to speak of
+            sys.stdout.write((line or "Clawdy") + "\n")
         return 0
     if "--hook-agy" in argv:             # Antigravity CLI: the event name comes as an argument
         try:

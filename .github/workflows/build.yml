@@ -81,6 +81,8 @@ jobs:
         run: |
           $env:USERPROFILE = $env:PROFILE; $env:APPDATA = "$env:PROFILE\AppData\Roaming"; $env:LOCALAPPDATA = "$env:PROFILE\AppData\Local"
           $exe = Resolve-Path dist\Clawdy\Clawdy.exe
+          New-Item -ItemType Directory -Force "$env:PROFILE\.gemini\antigravity-cli" | Out-Null   # a (fake) Antigravity CLI
+          Set-Content "$env:PROFILE\.gemini\antigravity-cli\settings.json" '{"colorScheme": "keep me"}'
           $r = Start-Process $exe -ArgumentList '--setup' -Wait -PassThru
           if ($r.ExitCode -ne 0) { throw "--setup failed ($($r.ExitCode))" }
 
@@ -96,6 +98,10 @@ jobs:
           # The hook, run exactly like Claude Code runs it
           node packaging\ci\hook_test.js "$env:PROFILE\.claude\settings.json" "$env:LOCALAPPDATA\clawdy\sessions"
           if ($LASTEXITCODE -ne 0) { throw "the hook did not work" }
+          # Antigravity: hooks + status line registered, the status line answers with the quota
+          $env:HOME = $env:PROFILE
+          python packaging\ci\agy_test.py "$env:LOCALAPPDATA\clawdy\agy-quota.json"
+          if ($LASTEXITCODE -ne 0) { throw "the agy status line did not work" }
 
           $r = Start-Process $exe -ArgumentList '--uninstall' -Wait -PassThru
           $s = Get-Content "$env:PROFILE\.claude\settings.json" -Raw | ConvertFrom-Json
@@ -103,6 +109,8 @@ jobs:
           if ($n -ne 1) { throw "after uninstall expected 1 event (the other one), found $n" }
           $run = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue).'Clawdy'
           if ($run) { throw "start at login was left behind" }
+          python packaging\ci\agy_after.py
+          if ($LASTEXITCODE -ne 0) { throw "agy was not disconnected" }
           "connect and disconnect OK; the other hook is intact"
 
       - name: "Test: animations (demo mode)"
@@ -228,8 +236,10 @@ jobs:
           export HOME="$RUNNER_TEMP/profile"; mkdir -p "$HOME/.claude"
           unset XDG_CONFIG_HOME XDG_CACHE_HOME     # the runner sets them; we want the defaults
           echo '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"node other-hook.js"}]}]}}' > "$HOME/.claude/settings.json"
+          mkdir -p "$HOME/.gemini/antigravity-cli"; echo '{"colorScheme": "keep me"}' > "$HOME/.gemini/antigravity-cli/settings.json"
           clawdy --setup
           node packaging/ci/hook_test.js "$HOME/.claude/settings.json" "$HOME/.cache/clawdy/sessions"
+          python3 packaging/ci/agy_test.py "$HOME/.cache/clawdy/agy-quota.json"
           grep -q 'Exec=clawdy' "$HOME/.config/autostart/clawdy.desktop"
           xvfb-run -a clawdy --demo --selftest 5
           clawdy --uninstall
@@ -240,6 +250,7 @@ jobs:
           assert d["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == "node other-hook.js", d
           print("disconnected; the other hook is intact")
           EOF
+          python3 packaging/ci/agy_after.py
 
       - name: "Test: auto-update (installed from source)"
         run: |
@@ -337,8 +348,10 @@ jobs:
           BIN="$PWD/dist/Clawdy.app/Contents/MacOS/Clawdy"
           export HOME="$RUNNER_TEMP/profile"; mkdir -p "$HOME/.claude"
           echo '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"node other-hook.js"}]}]}}' > "$HOME/.claude/settings.json"
+          mkdir -p "$HOME/.gemini/antigravity-cli"; echo '{"colorScheme": "keep me"}' > "$HOME/.gemini/antigravity-cli/settings.json"
           "$BIN" --setup
           node packaging/ci/hook_test.js "$HOME/.claude/settings.json" "$HOME/Library/Caches/clawdy/sessions"
+          python3 packaging/ci/agy_test.py "$HOME/Library/Caches/clawdy/agy-quota.json"
           test -f "$HOME/Library/LaunchAgents/com.clawdy.app.plist"
           "$BIN" --uninstall
           python3 - <<'EOF'
@@ -348,6 +361,7 @@ jobs:
           assert not os.path.exists(os.path.expanduser("~/Library/LaunchAgents/com.clawdy.app.plist"))
           print("disconnected; the other hook is intact")
           EOF
+          python3 packaging/ci/agy_after.py
 
       - name: "Test: animations (demo mode)"
         run: |
