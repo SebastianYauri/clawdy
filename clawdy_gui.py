@@ -459,6 +459,9 @@ def bars(data):
         pct, reset = float(lim.get("percent") or 0), lim.get("resets_at")
         if _passed(reset):                 # cached data from before a reset: it's 0 now
             pct, reset = 0.0, None
+        group = ((lim.get("scope") or {}).get("model") or {}).get("display_name")
+        if group and kind in ("session", "weekly_all"):     # several model pools, each with both windows
+            name = "%s %s" % (group.split()[0], tr("short.session" if kind == "session" else "short.weekly"))
         found.append((ORDER.get(kind, 9), name, pct, reset))
     out = [(n, p, r) for _, n, p, r in sorted(found, key=lambda f: f[0])]
     if not out:
@@ -1409,7 +1412,8 @@ class Widget:
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("action", tr("menu.skin"), lambda: w.root.after(50, w.open_creator)),
             ("action", tr("menu.codexpet"), w.install_codex_pet),
-        ]
+        ] + ([("action", tr("menu.agy_quota"), w.connect_agy_quota)]
+             if agy.installed() and not agy.mcp_registered() else [])
 
     def design_costumes(self):
         """Export a body reference and the current look as PNGs and open the folder to draw over them."""
@@ -1423,6 +1427,11 @@ class Widget:
         except Exception as e:
             self.log("design", e)
             self.flash(tr("share.failed"), 4)
+
+    def connect_agy_quota(self):
+        """Register Clawdy in agy as the MCP server that reads its quota."""
+        err = agy.register_mcp()
+        self.flash(tr("agy.connected") if not err else err, 8)
 
     def install_codex_pet(self):
         """Copy the bundled Clawdy pet into Codex's pets folder (Codex app and CLI load it with /pet)."""

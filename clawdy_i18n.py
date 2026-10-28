@@ -29,6 +29,8 @@ STRINGS = {
     "menu.chat_agy": ("New chat in Antigravity", "Nuevo chat en Antigravity"),
     "chat.agy": ("chat in Antigravity", "chat en Antigravity"),
     "share.title_agy": ("My Gemini usage", "Mi uso de Gemini"),
+    "menu.agy_quota": ("Show Gemini quota (register in agy)", "Mostrar cuota de Gemini (registrar en agy)"),
+    "agy.connected": ("done: the quota shows while agy runs", "listo: la cuota aparece mientras agy esté abierto"),
     "error.codex_none": ("use Codex once to see its usage", "usa Codex una vez para ver su uso"),
     "menu.source": ("Usage from", "Uso de"),
     "share.title_codex": ("My Codex usage", "Mi uso de Codex"),

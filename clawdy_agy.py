@@ -104,47 +104,122 @@ def state_for(ev, tool):
 
 
 QUOTA_FILE = os.path.join(cs.cache_dir(), "agy-quota.json")
-QUOTA_EVERY = 60
+SERVICE = "/exa.language_server_pb.LanguageServerService"
+METADATA = {"metadata": {"ideName": "antigravity", "extensionName": "antigravity", "ideVersion": "unknown", "locale": "en"}}
+
+
+def endpoint_from_env():
+    """(scheme, host, port, token) handed to agy's child processes, or None."""
+    token = os.environ.get("ANTIGRAVITY_CSRF_TOKEN")
+    addr = os.environ.get("ANTIGRAVITY_LS_ADDRESS") or ""
+    port = os.environ.get("ANTIGRAVITY_SIDECAR_WEB_PORT") or ""
+    if not token:
+        return None
+    scheme, host = "http", "127.0.0.1"
+    if "://" in addr:
+        scheme, addr = addr.split("://", 1)
+    if ":" in addr:
+        host, addr_port = addr.rsplit(":", 1)
+        port = port or addr_port
+    if not port.isdigit():
+        return None
+    return scheme, host or "127.0.0.1", int(port), token
+
+
+def endpoints_from_processes():
+    """The Antigravity desktop app runs a language server whose command line carries
+    `--csrf_token` and `--extension_server_port`: that's how every quota tracker finds it."""
+    import subprocess
+    out = []
+    try:
+        if cs.WIN:
+            text = subprocess.run(["wmic", "process", "get", "CommandLine"], capture_output=True, text=True, timeout=5).stdout
+        else:
+            text = subprocess.run(["ps", "-axww", "-o", "command="], capture_output=True, text=True, timeout=5).stdout
+    except Exception:
+        return out
+    for line in text.splitlines():
+        if "language_server" not in line or "csrf_token" not in line:
+            continue
+        m_tok = re.search(r"--csrf_token[= ]\"?([A-Za-z0-9-]+)", line)
+        m_port = re.search(r"--extension_server_port[= ](\d+)", line)
+        if m_tok and m_port:
+            out.append(("http", "127.0.0.1", int(m_port.group(1)), m_tok.group(1)))
+    return out
+
+
+def call(endpoint, method, timeout=4):
+    import ssl
+    import urllib.request
+    scheme, host, port, token = endpoint
+    url = "%s://%s:%d%s/%s" % (scheme, host, port, SERVICE, method)
+    req = urllib.request.Request(url, data=json.dumps(METADATA).encode(), method="POST", headers={
+        "Content-Type": "application/json", "X-Codeium-Csrf-Token": token})
+    ctx = ssl._create_unverified_context() if scheme == "https" else None
+    body = urllib.request.urlopen(req, timeout=timeout, context=ctx).read()
+    return json.loads(body.decode("utf-8", "replace"))
+
+
+def _fraction(raw):
+    if isinstance(raw, dict):
+        if raw.get("case") == "remainingFraction":
+            raw = raw.get("value")
+        else:
+            raw = raw.get("remainingFraction")
+    try:
+        return None if raw is None else max(0.0, min(1.0, float(raw)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _reset(value):
+    if isinstance(value, (int, float)) and value > 0:
+        return datetime.fromtimestamp(float(value), timezone.utc).isoformat()
+    return value if isinstance(value, str) and value else None
+
+
+def parse_summary(body):
+    """[(kind, model group, percent used, resets_at)] from RetrieveUserQuotaSummary."""
+    root = body.get("response") if isinstance(body.get("response"), dict) else body
+    out = []
+    for group in root.get("groups") or []:
+        if not isinstance(group, dict):
+            continue
+        scope = group.get("displayName") or ""
+        for bucket in group.get("buckets") or []:
+            if not isinstance(bucket, dict) or bucket.get("disabled") is True:
+                continue
+            name = ("%s %s" % (bucket.get("bucketId") or "", bucket.get("displayName") or "")).lower()
+            kind = "weekly_all" if "week" in name else ("session" if re.search(r"\b5h\b|5-hour|five[ -]hour|session", name) else None)
+            frac = _fraction(bucket.get("remaining") if "remaining" in bucket else bucket)
+            if kind is None or frac is None:
+                continue
+            out.append((kind, scope, round((1 - frac) * 100, 1), _reset(bucket.get("resetTime"))))
+    return out
+
+
+def refresh_quota(endpoint):
+    """Ask the local server and save the numbers. Raises on failure."""
+    rows = parse_summary(call(endpoint, "RetrieveUserQuotaSummary"))
+    if rows:
+        cs.write_json(QUOTA_FILE, {"updated": time.time(), "rows": rows})
+    return rows
 
 
 def ask_server_quota():
-    """From inside a hook: the CLI hands its children the address of its local server and a
-    one-launch CSRF token; use them (in memory only) to read the quota summary and save just
-    the numbers. Any problem is ignored: the hook must never fail or slow the CLI down."""
-    token = os.environ.get("ANTIGRAVITY_CSRF_TOKEN")
-    port = os.environ.get("ANTIGRAVITY_SIDECAR_WEB_PORT")
-    addr = os.environ.get("ANTIGRAVITY_LS_ADDRESS")
-    if not token or not (port or addr):
+    """From a hook: works only if agy ever hands hooks its token (it doesn't today)."""
+    endpoint = endpoint_from_env()
+    if not endpoint:
         return
     try:
-        if os.path.getmtime(QUOTA_FILE) > time.time() - QUOTA_EVERY:
-            return                                          # fresh enough
+        if os.path.getmtime(QUOTA_FILE) > time.time() - 60:
+            return
     except OSError:
         pass
-    import urllib.request
-    host = addr if addr and "://" in addr else "http://127.0.0.1:%s" % (port or addr.rsplit(":", 1)[-1])
-    url = host.rstrip("/") + "/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary"
-    req = urllib.request.Request(url, data=b"{}", method="POST", headers={
-        "Content-Type": "application/json", "x-codeium-csrf-token": token})
     try:
-        body = json.loads(urllib.request.urlopen(req, timeout=3).read().decode("utf-8", "replace"))
+        refresh_quota(endpoint)
     except Exception:
-        return
-    summary = body.get("quotaSummary") or body
-    buckets = summary.get("quotaBuckets") or body.get("quotaBuckets") or []
-    limits = []
-    for b in buckets:
-        try:
-            frac = float(b.get("remainingFraction", 1.0))
-        except (TypeError, ValueError):
-            continue
-        reset = b.get("resetTime")
-        label = b.get("refreshWindowLabel") or b.get("quotaBucketName") or ""
-        limits.append({"kind": "weekly_all" if "week" in str(label).lower() else "session",
-                       "percent": round(max(0.0, min(1.0, 1 - frac)) * 100, 1), "resets_at": reset,
-                       "name": b.get("quotaBucketName") or label})
-    if limits:
-        cs.write_json(QUOTA_FILE, {"limits": limits, "updated": time.time(), "raw_keys": sorted(summary.keys())[:20]})
+        pass
 
 
 def handle(ev, data):
@@ -191,21 +266,32 @@ def _logs():
 
 
 def usage():
-    """The quota the hook saved from the CLI's own server (fresh within a day), else a full bar
-    while the CLI log reports the quota exhausted, else None."""
+    """Numbers saved by Clawdy's MCP server while agy runs (fresh within a day), else the
+    desktop app's language server, else a full bar while the CLI log says the quota is out."""
+    rows, updated = None, 0
     try:
         q = json.load(open(QUOTA_FILE))
-        if time.time() - q.get("updated", 0) < 24 * 3600 and q.get("limits"):
-            limits = []
-            for l in q["limits"]:
-                reset = l.get("resets_at")
-                if isinstance(reset, (int, float)):
-                    reset = datetime.fromtimestamp(reset, timezone.utc).isoformat()
-                limits.append({"kind": l["kind"], "percent": l["percent"], "resets_at": reset,
-                               "scope": {"model": {"display_name": l.get("name")}} if l.get("name") else None})
-            return {"limits": limits, "source": "agy", "updated": q["updated"]}
+        if time.time() - q.get("updated", 0) < 24 * 3600 and q.get("rows"):
+            rows, updated = [tuple(r) for r in q["rows"]], q["updated"]
     except Exception:
         pass
+    if rows is None or time.time() - updated > 120:
+        for endpoint in endpoints_from_processes():        # the desktop app, if it's running
+            try:
+                live = refresh_quota(endpoint)
+            except Exception:
+                continue
+            if live:
+                rows, updated = live, time.time()
+                break
+    if rows:
+        limits = []
+        for kind, scope, pct, reset in rows:
+            lim = {"kind": kind, "percent": pct, "resets_at": reset}
+            if scope:
+                lim["scope"] = {"model": {"display_name": scope}}
+            limits.append(lim)
+        return {"limits": limits, "source": "agy", "updated": updated}
     return usage_from_log()
 
 
@@ -275,6 +361,31 @@ def resume(session):
 
 def new_chat_in(cwd):
     return cs.open_terminal(_in(cwd))
+
+
+MCP_CONFIG = os.path.join(HOME, "config", "mcp_config.json")
+
+
+def mcp_registered():
+    try:
+        return "clawdy" in json.load(open(MCP_CONFIG, encoding="utf-8-sig")).get("mcpServers", {}) or \
+               '"clawdy"' in open(MCP_CONFIG, encoding="utf-8-sig").read()
+    except Exception:
+        return False
+
+
+def register_mcp():
+    """`agy mcp add clawdy <clawdy> --agy-mcp`, so agy launches Clawdy's quota reader. Returns an error or None."""
+    cli = cli_path()
+    if not cli:
+        return "agy not found"
+    import subprocess
+    prog = [sys.executable] if cs.FROZEN else [sys.executable, cs.MAIN]
+    try:
+        r = subprocess.run([cli, "mcp", "add", "clawdy"] + prog + ["--agy-mcp"], capture_output=True, text=True, timeout=30)
+    except Exception as e:
+        return str(e)[:80]
+    return None if r.returncode == 0 else (r.stderr or r.stdout).strip()[:120]
 
 
 def open_new_chat():

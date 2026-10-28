@@ -22,6 +22,9 @@ def main(argv):
         import clawdy_hook
         clawdy_hook.main()
         return 0
+    if "--agy-mcp" in argv:              # registered in agy as an MCP server: reads its quota
+        import clawdy_agy_mcp
+        return clawdy_agy_mcp.main()
     if "--hook-agy" in argv:             # Antigravity CLI: the event name comes as an argument
         try:
             import json
