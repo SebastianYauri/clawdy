@@ -34,7 +34,8 @@ SOURCE_FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.p
                 "assets/parts/%s/%s.png" % (slot, name) for slot, names in (
                     ("head", ("witch", "santa", "frank", "slick", "cowboy", "chef", "pirate", "astronaut", "ninja")),
                     ("face", ("stitches", "fangs", "glasses", "eyepatch", "blush")),
-                    ("body", ("bolts", "scarf", "bandana", "sheet", "pumpkin", "cape_back"))) for name in names]
+                    ("body", ("bolts", "scarf", "bandana", "sheet", "pumpkin", "cape_back")),
+                    ("fx", ("heart", "star", "spark", "sweat", "dust", "smoke", "code", "zzz", "note", "speed"))) for name in names]
 RETRY_AFTER = 24 * 3600             # don't retry a failed version for a day
 
 

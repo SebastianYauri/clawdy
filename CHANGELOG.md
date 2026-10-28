@@ -24,7 +24,13 @@ All notable changes to Clawdy are listed here. Versions follow
   The ghost's sheet ripples while it floats. Parts can now wobble on their own
   (hats, capes, sheets), which later animations will use.
 - **Clawdy as a Codex Pet.** `codex-pet/` holds Clawdy (and each costume) in
-  the Codex Pets format, rendered from Clawdy's own animations. **Settings… →
+  the Codex Pets format. Every row is eight designed keyframes: a run that
+  leans into the stride with dust and speed lines, a wave with hearts, a jump
+  with crouch, stretch, stars at the top and a squash on landing, a failure
+  with X eyes and smoke, waiting with a sweat drop, working with code flying
+  off the laptop and a review with the magnifying glass. The effects are small
+  pixel-art sprites (`assets/parts/fx`) drawn on the same 32×32 grid as the
+  costume parts, so they can be edited in Pixelorama too. **Settings… →
   Install as a Codex pet** copies it into `~/.codex/pets`; then `/pet` in Codex.
 - **Codex support.** Clawdy now works with OpenAI's Codex CLI: it reads your
   ChatGPT plan's 5-hour and weekly limits and what Codex is doing from the

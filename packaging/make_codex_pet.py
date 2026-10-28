@@ -23,10 +23,66 @@ sys.path.insert(0, ROOT)
 CELL_W, CELL_H, COLS = 192, 208, 8
 K = 1.5                                   # scene units → sheet pixels: one Clawdy pixel = 9 px
 # Codex's v1 rows, in order, as Clawdy states: (work state or None, forced act, walking direction)
-ROWS = [("idle", None, "look", 1), ("running-right", None, "walk", 1), ("running-left", None, "walk", -1),
-        ("waving", None, "wave", 1), ("jumping", None, "jump", 1), ("failed", "error", None, 1),
-        ("waiting", "notification", None, 1), ("working", "typing", None, 1), ("review", "reading", None, 1)]
+ROWS = ["idle", "running-right", "running-left", "waving", "jumping", "failed", "waiting", "working", "review"]
 FRAME_DT = 0.125                          # the pet plays at about 8 frames per second
+
+
+def poses(w, cx, feet):
+    """Eight designed keyframes per Codex row: (row name, [pose dicts])."""
+    import math
+    SH = 54
+    H = lambda i: math.sin(math.pi * i / 8)          # 0 → 1 → 0 across the row
+
+    def base(**kw):
+        p = dict(dy=0.0, dx=0.0, sx=1.0, sy=1.0, rot=0.0, arm_l=0.0, arm_r=0.0, eye="open", eye_dx=0.0,
+                 eye_dy=0.0, step=None, tuck=False, props=[], fx=[], part_fx={})
+        p.update(kw)
+        return p
+
+    def run(d):
+        out = []
+        for i in range(8):
+            bob = [0, 2, 4, 2, 0, 2, 4, 2][i]
+            fx = []
+            if i % 2 == 0:
+                fx.append(("dust", cx - d * 36, feet - 3, 0.8))
+            if i % 4 == 1:
+                fx.append(("speed", cx - d * 44, feet - 28, 0.9))
+            out.append(base(dy=-bob, rot=0.14 * d, step=i % 2, eye_dx=2.5 * d, eye_dy=0.5, arm_l=-2, arm_r=-2,
+                            part_fx={"head": (-d * 2.5, 1.0, -d * 0.12)}, fx=fx))
+        return out
+
+    idle = [base(sy=1 + 0.025 * math.sin(2 * math.pi * i / 8), eye="closed" if i == 6 else "open",
+                 eye_dx=[0, 0, -2, -2, 0, 2, 2, 0][i], arm_l=math.sin(i) * 0.5, arm_r=-math.sin(i) * 0.5) for i in range(8)]
+    wave = [base(arm_r=-10 + 4 * math.sin(math.pi * i / 2), arm_l=1, eye="happy", eye_dx=1,
+                 dy=-abs(math.sin(math.pi * i / 4)) * 1.5,
+                 fx=([("heart", cx + 30, feet - 62 - (i - 2) * 5, 0.8)] if i >= 2 else [])
+                    + ([("heart", cx + 44, feet - 50 - (i - 5) * 6, 0.6)] if i >= 5 else [])) for i in range(8)]
+    jump = []
+    for i in range(8):
+        h = [0, .35, .75, 1, 1, .75, .35, 0][i]
+        p = base(dy=-h * 40, tuck=h > 0.5, eye="happy" if h > 0.3 else "open",
+                 sy=0.85 if i == 0 else (0.88 if i == 7 else (1.08 if i in (1, 2) else 1.0)),
+                 sx=1.12 if i == 0 else (1.1 if i == 7 else (0.95 if i in (1, 2) else 1.0)),
+                 arm_l=-9 if h > 0.3 else 0, arm_r=-9 if h > 0.3 else 0)
+        if i in (3, 4):
+            p["fx"] = [("star", cx - 30, feet - 76, 0.7), ("star", cx + 30, feet - 70, 0.7), ("spark", cx, feet - 84, 0.6)]
+        if i == 7:
+            p["fx"] = [("dust", cx - 30, feet - 2, 0.7), ("dust", cx + 30, feet - 2, 0.7)]
+        jump.append(p)
+    failed = [base(dx=[-2, 2, -2, 2, -1, 1, 0, 0][i], eye="x", sy=0.95, arm_l=-3, arm_r=-3, props=["err"],
+                   fx=[("smoke", cx - 8, feet - SH - 16 - (i % 4) * 4, 0.7 + (i % 4) * 0.08),
+                       ("smoke", cx + 10, feet - SH - 8 - ((i + 2) % 4) * 4, 0.55 + ((i + 2) % 4) * 0.08)]) for i in range(8)]
+    waiting = [base(dy=-abs(math.sin(math.pi * i / 4)) * 6, eye="scared", arm_l=-8 + math.sin(i * 1.5) * 2,
+                    arm_r=-8 - math.sin(i * 1.5) * 2, props=["bang"],
+                    fx=[("sweat", cx + 24, feet - 46 + (i % 4) * 3, 0.7)]) for i in range(8)]
+    working = [base(arm_l=-4 if i % 2 else 0, arm_r=0 if i % 2 else -4, eye_dy=2, props=["laptop"],
+                    fx=[("code", cx + 28 - (i % 2) * 56, feet - 60 - i * 3, 0.55)] + ([("spark", cx + 34, feet - 40, 0.45)] if i == 5 else []))
+               for i in range(8)]
+    review = [base(rot=0.06 * math.sin(math.pi * i / 4), eye_dx=[-2, -2, -1, 0, 1, 2, 2, 0][i], arm_r=-5, arm_l=1,
+                   props=["magnifier"], fx=([("spark", cx + 32, feet - 58, 0.5)] if i == 4 else [])) for i in range(8)]
+    return [("idle", idle), ("running-right", run(1)), ("running-left", run(-1)), ("waving", wave),
+            ("jumping", jump), ("failed", failed), ("waiting", waiting), ("working", working), ("review", review)]
 
 
 def render(costume, bg, out_dir):
@@ -38,19 +94,17 @@ def render(costume, bg, out_dir):
     import tkinter as tk
     from PIL import ImageGrab
     import clawdy_gui as g
+    import clawdy_character as character
 
     g.tk = tk
     g.CARD = (0.0, 0.0, 0.0) if bg == "black" else (1.0, 1.0, 1.0)
     g.DEMO_STATES = [None]
-    g.HOP = 1.0                                       # room to jump: no rings around it here
     root = tk.Tk()
     root.withdraw()
     w = g.Widget(root, demo=True)
     w.draw = w.update_view = lambda *a: None          # the widget's own loop stays quiet
     w.set_costume(costume)
     w.ready, w.intro_t0 = True, None
-    for lim in w.st.data["limits"]:
-        lim["percent"] = 12                           # calm pace: energy ≈ 1
     win = tk.Toplevel(root)
     win.overrideredirect(True)
     win.geometry("%dx%d+100+100" % (CELL_W, CELL_H))
@@ -59,25 +113,35 @@ def render(costume, bg, out_dir):
     canvas.pack()
     w.canvas = canvas
     win.update()
+    skins = w.skins
 
+    def fx(name, x, y, s):
+        """A pixel-art effect sprite (assets/parts/fx), centered at (x, y) in scene units."""
+        path = character.part_path("fx", name)
+        xf = g.Xform(x, y + 15 * s, s, s)             # the 32×32 image is centered at sprite (0, -15)
+        for rx, ry, rw, rh, col in skins.runs(path) or []:
+            w.px_rect(xf, rx, ry, col, rw, rh)
+
+    cx, feet = CELL_W / K / 2, 118
     n = 0
-    for row, (name, work, act, direction) in enumerate(ROWS):
-        g.DEMO_STATES = [work]
-        w.work, w._work_prev, w._work_t, w._work_seed = None, None, 0.0, 1 if name == "review" else 0
-        w.parts, w.emit, w.hammer = [], 0.0, 0.0
-        w.dir, w.pos = direction, 0.0
-        w.force, w.act_t = act, 0.0
-        clock[0] += 10                                # a fresh moment for every row
-        w._last = clock[0]
-        random.seed(row)
-        for f in range(COLS):
+    for name, frames in poses(w, cx, feet):
+        for i, p in enumerate(frames):
             clock[0] += FRAME_DT
-            if act:
-                w.force = act
-                w.act_t = f / COLS * 3.6              # one full cycle of the act across the row
-            w.pos = 0.0                               # Codex moves the pet; the sprite stays centered
+            w.parts, w.part_fx = [], p["part_fx"]
             canvas.delete("all")
-            w.draw_clawd(CELL_W / K / 2, 118, 12)
+            bx = cx + p["dx"]
+            xf = g.Xform(bx, feet + p["dy"] - g.SH / 2 * p["sy"], p["sx"], p["sy"], p["rot"])
+            for fname, x, y, s in p["fx"]:
+                if fname in ("dust", "smoke", "speed"):           # behind
+                    fx(fname, x, y, s)
+            w.draw_costume(xf, None, "back", 0.0, 0.6, p["eye"], p["eye_dx"])
+            w.draw_sprite(xf, p["arm_l"], p["arm_r"], p["eye"], p["eye_dx"], p["eye_dy"], p["step"], p["tuck"])
+            w.draw_costume(xf, None, "front", 0.0, 0.6, p["eye"], p["eye_dx"])
+            w.pos, w.dir = 0.0, 1
+            w.draw_props(p["props"], bx, feet + p["dy"], feet + p["dy"] - g.SH * p["sy"], clock[0] - 1_000_000.0, p["arm_r"])
+            for fname, x, y, s in p["fx"]:
+                if fname not in ("dust", "smoke", "speed"):       # in front
+                    fx(fname, x, y, s)
             canvas.scale("all", 0, 0, K, K)
             win.update()
             x, y = win.winfo_rootx(), win.winfo_rooty()

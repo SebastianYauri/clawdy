@@ -15,7 +15,8 @@
 - **By hand:** copy a folder to `~/.codex/pets/` (Windows: `%USERPROFILE%\.codex\pets\`), then in the Codex app
   or CLI type `/pet` and pick it. The CLI shows pets in iTerm2, Kitty and other terminals with Sixel graphics.
 
-Each pet is a `pet.json` plus a `spritesheet.webp` (8 columns × 9 rows of 192 × 208 px: idle, running right and
+Every row is eight hand-designed keyframes (run, wave, jump, fail, wait, work, review) with
+pixel-art effects from `assets/parts/fx`. Each pet is a `pet.json` plus a `spritesheet.webp` (8 columns × 9 rows of 192 × 208 px: idle, running right and
 left, waving, jumping, failed, waiting, working and review). `packaging/make_codex_pet.py` regenerates them.
 
 Fan art inspired by Clawd, the Claude Code mascot; not affiliated with Anthropic or OpenAI. MIT license.

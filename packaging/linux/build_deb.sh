@@ -20,7 +20,7 @@ install -m 644 "$ROOT"/clawdy.py "$ROOT"/clawdy_gui.py "$ROOT"/clawdy_hook.py \
                "$PKG/usr/lib/clawdy/"
 install -m 644 "$ROOT/assets/icon.png" "$ROOT/assets/alert.wav" "$ROOT/assets/done.wav" "$ROOT/assets/ask.wav" \
                "$PKG/usr/lib/clawdy/assets/"
-for slot in head face body; do
+for slot in head face body fx; do
     install -d "$PKG/usr/lib/clawdy/assets/parts/$slot"
     install -m 644 "$ROOT"/assets/parts/$slot/*.png "$PKG/usr/lib/clawdy/assets/parts/$slot/"
 done

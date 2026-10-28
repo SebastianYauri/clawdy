@@ -342,8 +342,38 @@ CAPE_LEFT = [  # rows 11..31, left half; mirrored
 ]
 
 
+# ---------------------------------------------------------------- effects (small sprites, centered at 16,16)
+
+FX = {
+    "heart": ({"r": "#f04a5e", "R": "#ff8a9a", "o": "#7a1626"}, [
+        ".oo..oo.", "oRrooRro", "oRrrrrro", "orrrrrro", ".orrrro.", "..orro..", "...oo..."]),
+    "star": ({"y": "#ffd75a", "Y": "#fff3b0", "o": "#b8860b"}, [
+        "...o...", "...y...", "..yYy..", "oyYYYyo", "..yYy..", "...y...", "...o..."]),
+    "spark": ({"y": "#ffe17a", "Y": "#ffffff"}, [
+        "..y..", "..Y..", "yYYYy", "..Y..", "..y.."]),
+    "sweat": ({"b": "#6fb7ff", "B": "#d6ecff", "o": "#2a6fb0"}, [
+        "..b..", ".bBb.", ".bBb.", "bBBbb", "bbbbo", ".ooo."]),
+    "dust": ({"g": "#c9c4bc", "G": "#f2efe9", "o": "#9b958c"}, [
+        "...ggg....", ".ggGGgg.g.", "gGGGGGgggg", ".ggggggg..", "..oo.oo..."]),
+    "smoke": ({"g": "#8d8a94", "G": "#b9b6c0", "o": "#5e5b66"}, [
+        "....ggg....", "..ggGGGgg..", ".gGGGGGGGg.", "gGGGGGGGGGg", ".ggGGGGGgg.", "..oggggggo.", "....ooo...."]),
+    "code": ({"g": "#5ad67d", "G": "#9ff5b5"}, [
+        ".g...g.", "g.....g", "g.....g", "Gg...gG", "g.....g", "g.....g", ".g...g."]),
+    "zzz": ({"w": "#f5f0e8"}, [
+        "wwww", "...w", "..w.", ".w..", "wwww"]),
+    "note": ({"y": "#ffd75a", "o": "#b8860b"}, [
+        "...yy", "...yoy", "...y.", "...y.", ".yyy.", "yyyy.", ".yy.."]),
+    "speed": ({"w": "#ffffff", "W": "#dfe6ff"}, [
+        "wwwwwww..", ".........", "..WWWWWWW", ".........", "wwwww...."]),
+}
+
+
 def main():
     parts = {}
+    for name, (pal, rows) in FX.items():
+        g = Grid()
+        g.rows(rows, 16 - len(rows) // 2, 16 - len(rows[0]) // 2)
+        parts["fx/" + name] = (g, pal)
     g = Grid(); g.rows(WITCH_ROWS, 0); parts["head/witch"] = (g, WITCH)
     g = Grid(); g.rows(SANTA_ROWS, 1); parts["head/santa"] = (g, SANTA)
     g = Grid(); g.rows(FRANK_HAIR, 7); parts["head/frank"] = (g, FRANK)
