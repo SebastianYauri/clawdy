@@ -13,6 +13,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+if sys.platform.startswith("linux"):
+    os.environ.setdefault("GDK_BACKEND", "x11")   # GTK (tray, pet window) alongside Tk, placeable
 
 
 def main(argv):

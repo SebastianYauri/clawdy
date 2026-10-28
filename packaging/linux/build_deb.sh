@@ -16,7 +16,7 @@ install -d "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/usr/lib/clawdy/assets" \
 install -m 644 "$ROOT"/clawdy.py "$ROOT"/clawdy_gui.py "$ROOT"/clawdy_hook.py \
                "$ROOT"/clawdy_system.py "$ROOT"/clawdy_update.py "$ROOT"/clawdy_version.py \
                "$ROOT"/clawdy_i18n.py "$ROOT"/clawdy_tray.py "$ROOT"/clawdy_walk.py "$ROOT"/clawdy_sessions.py "$ROOT"/clawdy_share.py "$ROOT"/clawdy_skins.py "$ROOT"/clawdy_codex.py \
-               "$ROOT"/clawdy_character.py "$ROOT"/clawdy_creator.py \
+               "$ROOT"/clawdy_character.py "$ROOT"/clawdy_creator.py "$ROOT"/clawdy_petgtk.py \
                "$PKG/usr/lib/clawdy/"
 install -m 644 "$ROOT/assets/icon.png" "$ROOT/assets/alert.wav" "$ROOT/assets/done.wav" "$ROOT/assets/ask.wav" \
                "$PKG/usr/lib/clawdy/assets/"
@@ -58,7 +58,7 @@ Section: utils
 Priority: optional
 Architecture: all
 Depends: python3 (>= 3.8), python3-tk
-Recommends: python3-pystray, gir1.2-ayatanaappindicator3-0.1
+Recommends: python3-pystray, gir1.2-ayatanaappindicator3-0.1, gir1.2-gtk-3.0, python3-gi-cairo
 Installed-Size: $SIZE
 Maintainer: SebastianYauri <77989694+SebastianYauri@users.noreply.github.com>
 Homepage: https://github.com/SebastianYauri/clawdy

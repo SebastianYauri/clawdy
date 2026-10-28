@@ -648,6 +648,7 @@ class Widget:
         self.v_pet = tk.BooleanVar(value=self.pet)
         self.pet_shaper, self.cur_act, self._pet_mon = None, None, None
         self.part_fx = {}                    # per-slot (dx, dy, rot) wobble for the current frame
+        self.petwin = None                   # Linux: the transparent GTK window that shows the pet
         self.skins = clawdy_skins.Skins(tk)  # costumes drawn in a pixel art editor, if any
         self.hist = self.load_history()      # [(time, {limit: (percent, resets_at)})] for the pace
         self._fresh = False                  # new usage arrived (set by the fetch thread)
@@ -796,11 +797,33 @@ class Widget:
             if self.walk:
                 self.end_walk()
         else:
+            if self.petwin:
+                self.petwin.close()
+                self.petwin = None
             self.pet_shaper = None
             self.round_corners(self.root, cw, h)
         self.root.geometry("+%d+%d" % self.home_xy())
         if self.tray:
             self.tray.refresh()
+
+    def pet_gtk(self):
+        """Linux: start (once) the transparent GTK window that mirrors the pet. False elsewhere."""
+        if self.keyed or not sys.platform.startswith("linux") or os.environ.get("CLAWDY_NO_GTK"):
+            return False
+        if self.petwin is None:
+            try:
+                import clawdy_petgtk
+                if not clawdy_petgtk.available():
+                    self.petwin = False
+                    return False
+                self.petwin = clawdy_petgtk.PetWindow(self, own_loop=not (self.tray and self.tray.active))
+                if self.pet_shaper is None:
+                    self.pet_shaper = Shaper(self.root)
+                self.pet_shaper.set([(0, 0, 1, 1)])      # the Tk window becomes a 1-pixel anchor
+            except Exception as e:
+                self.log("pet gtk", e)
+                self.petwin = False
+        return bool(self.petwin)
 
     def pet_shape(self):
         """Linux: clip the window to what was drawn, so the desktop shows through."""
@@ -1794,6 +1817,8 @@ class Widget:
         now_pc = time.perf_counter()
         wdt, self._walk_clock = min(now_pc - self._walk_clock, 0.1), now_pc
         if self.pet and self._placed:
+            if self.petwin:
+                self.petwin.poll()
             self.pet_roam(wdt)
         if self.walk:
             if self.work in ("notification", "error") or self._drag or not self.v_walks.get():
@@ -2833,7 +2858,12 @@ class Widget:
                 col = (0.95, 0.40, 0.35) if time.time() < self.alarm_until else self.note_color
                 self.text(CW / 2, 8, text, hx(col), 6, bold=True, anchor="center")
             self.layer(mark, "dyn")
-            self.pet_shape()
+            if self.pet_gtk():
+                import clawdy_petgtk
+                self.petwin.push(self.root.winfo_x(), self.root.winfo_y(), self.root.winfo_width(),
+                                 self.root.winfo_height(), clawdy_petgtk.snapshot(self.canvas, self.root))
+            else:
+                self.pet_shape()
             if self.panel_out or self.e > 0:
                 self.draw_panel_window(rows, key)
             return
