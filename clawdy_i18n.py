@@ -198,6 +198,11 @@ STRINGS = {
     "welcome.hint": ("Change this and more anytime: right-click me, or Settings in the tray icon.",
                      "Cambia esto y más cuando quieras: clic derecho sobre mí, o Ajustes en el ícono de la barra."),
     "welcome.start": ("Get started", "Empezar"),
+    "welcome.source": ("Show usage from", "Mostrar el uso de"),
+    "welcome.src_auto": ("Auto", "Auto"),
+    "welcome.corner": ("Where should I sit?", "¿Dónde me pongo?"),
+    "welcome.skin": ("Let me pick my skin when I start", "Elegir mi skin al empezar"),
+    "menu.corner": ("Corner", "Esquina"),
 
     "system.read_settings": ("Couldn't read the Claude Code settings ({e}).",
                              "No pude leer la configuración de Claude Code ({e})."),

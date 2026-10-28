@@ -727,9 +727,26 @@ class Widget:
         self.panel.update_idletasks()
         self.round_corners(self.panel, pw, h)
         self.set_alpha(0.0)
-        x = self.root.winfo_screenwidth() - cw - round(30 * k)
-        self.root.geometry("+%d+%d" % (x, round(60 * k)))
+        self.root.geometry("+%d+%d" % self.home_xy())
         self._placed = True
+
+    def home_xy(self):
+        """Where Clawdy goes: where it was left, else the chosen corner (top right by default)."""
+        k = self.k
+        cw, h = round(CW * k), round(H * k)
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        cfg = cs.load_config()
+        pos = cfg.get("pos")
+        if pos and 0 <= pos[0] <= sw - cw and 0 <= pos[1] <= sh - h:
+            return int(pos[0]), int(pos[1])
+        corner = cfg.get("corner", "tr")
+        x = round(30 * k) if "l" in corner else sw - cw - round(30 * k)
+        y = round(60 * k) if "t" in corner else sh - h - round(60 * k)
+        return x, y
+
+    def set_corner(self, corner):
+        cs.update_config(corner=corner, pos=None)
+        self.root.geometry("+%d+%d" % self.home_xy())
 
     # ------------------------------------------------ updates
 
@@ -845,14 +862,15 @@ class Widget:
             self._hat[key] = top
         return self._hat[key]
 
-    def draw_still(self, canvas, cx, cy, scale, ch=None, eye="open"):
-        """Clawdy standing still, drawn onto another canvas (previews)."""
+    def draw_still(self, canvas, cx, cy, scale, ch=None, eye="open", arm_l=0.0, arm_r=0.0, eye_dx=0.0,
+                   eye_dy=0.0, step=None, tuck=False, dy=0.0, sx=1.0, sy=1.0, rot=0.0):
+        """Clawdy in a given pose, drawn onto another canvas (previews). (cx, cy) is the body center."""
         saved, self.canvas = self.canvas, canvas
         try:
-            xf = Xform(cx, cy, scale, scale)
-            self.draw_costume(xf, None, "back", 0, 0.6, eye, 0, ch)
-            self.draw_sprite(xf, 0, 0, eye, 0, 0, None, False, ch)
-            self.draw_costume(xf, None, "front", 0, 0.6, eye, 0, ch)
+            xf = Xform(cx, cy + (dy + SH / 2 * (1 - sy)) * scale, scale * sx, scale * sy, rot)   # anchored at the feet
+            self.draw_costume(xf, None, "back", 0, 0.6, eye, eye_dx, ch)
+            self.draw_sprite(xf, arm_l, arm_r, eye, eye_dx, eye_dy, step, tuck, ch)
+            self.draw_costume(xf, None, "front", 0, 0.6, eye, eye_dx, ch)
         finally:
             self.canvas = saved
 
@@ -1034,6 +1052,7 @@ class Widget:
         self._drag = False
         if self.held:
             self.held = False
+            cs.update_config(pos=[self.root.winfo_x(), self.root.winfo_y()])   # remembered across restarts
             now = time.time()
             shaken = len([t for t in self._shakes if now - t < 1.2]) >= 4
             if shaken or math.hypot(*self._vel) > 2500:
@@ -1174,6 +1193,8 @@ class Widget:
             ("pills", tr("menu.source"), [("auto", tr("costume.auto")), ("claude", "Claude"), ("codex", "Codex")],
              lambda: cs.load_config().get("source", "auto"), w.set_source, 3),
             ("pills", tr("menu.done_after"), list(DONE_AFTER), lambda: w.done_after, w.set_done_after, 4),
+            ("pills", tr("menu.corner"), [("tl", "↖"), ("tr", "↗"), ("bl", "↙"), ("br", "↘")],
+             lambda: cs.load_config().get("corner", "tr") if not cs.load_config().get("pos") else None, w.set_corner, 4),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("action", tr("menu.skin"), lambda: w.root.after(50, w.open_creator)),
             ("action", tr("menu.codexpet"), w.install_codex_pet),
@@ -3272,6 +3293,19 @@ class Welcome:
             ttk.Label(body, wraplength=round(370 * k), justify="left", foreground="#b5482a",
                       text=tr("welcome.no_login")).pack(anchor="w", pady=(0, 12))
 
+        row = ttk.Frame(body)                       # which plan to show
+        row.pack(anchor="w", pady=(0, 8))
+        ttk.Label(row, text=tr("welcome.source")).pack(side="left", padx=(0, 8))
+        self.v_source = tk.StringVar(value="auto")
+        for value, text in (("auto", tr("welcome.src_auto")), ("claude", "Claude"), ("codex", "Codex (GPT)")):
+            ttk.Radiobutton(row, text=text, value=value, variable=self.v_source).pack(side="left", padx=(0, 10))
+        row = ttk.Frame(body)                       # which corner
+        row.pack(anchor="w", pady=(0, 10))
+        ttk.Label(row, text=tr("welcome.corner")).pack(side="left", padx=(0, 8))
+        self.v_corner = tk.StringVar(value="tr")
+        for value, text in (("tl", "↖"), ("tr", "↗"), ("bl", "↙"), ("br", "↘")):
+            ttk.Radiobutton(row, text=text, value=value, variable=self.v_corner).pack(side="left", padx=(0, 6))
+
         self.v_hooks = tk.BooleanVar(value=True)
         self.v_start = tk.BooleanVar(value=True)
         self.v_connect = tk.BooleanVar(value=not cs.logged_in())
@@ -3284,6 +3318,9 @@ class Welcome:
         self.v_tasks = tk.BooleanVar(value=True)
         ttk.Checkbutton(body, text=tr("welcome.tasks"),
                         variable=self.v_tasks).pack(anchor="w", pady=(4, 0))
+        self.v_skin = tk.BooleanVar(value=True)
+        ttk.Checkbutton(body, text=tr("welcome.skin"),
+                        variable=self.v_skin).pack(anchor="w", pady=(4, 0))
         ttk.Label(body, foreground="#777777", wraplength=round(370 * k), justify="left",
                   text=tr("welcome.hint")
                   ).pack(anchor="w", pady=(10, 14))
@@ -3301,9 +3338,9 @@ class Welcome:
 
     def done(self):
         err = cs.setup(hooks=self.v_hooks.get(), autostart=self.v_start.get())
-        cs.update_config(tasks=self.v_tasks.get())
+        cs.update_config(tasks=self.v_tasks.get(), source=self.v_source.get(), corner=self.v_corner.get())
         self.win.destroy()
-        self.on_done(err, connect=self.v_connect.get())
+        self.on_done(err, connect=self.v_connect.get(), skin=self.v_skin.get())
 
     def skip(self):
         """Closing the welcome changes nothing; it shows again next time."""
@@ -3381,11 +3418,13 @@ def run(demo=False, selftest=0):
 
     app = {"widget": None, "welcome": None}
 
-    def start(err=None, connect=False):
+    def start(err=None, connect=False, skin=False):
         app["welcome"] = None
         w = app["widget"] = Widget(root, demo=demo)
         if connect:                            # agreed in the welcome screen: no second question
             root.after(1500, lambda: w.setup_claude_code(ask=False))
+        if skin:                               # asked to pick a skin right away
+            root.after(2500, w.open_creator)
         if err:
             w.st.error = err[:60]
         root.deiconify()

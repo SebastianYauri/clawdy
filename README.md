@@ -154,7 +154,8 @@ clicking **Click to see your usage** sets Claude Code up for you in the
 background with the official installer: all you do is click **Authorize** in the
 browser window that opens. No terminal, no commands. The first time Clawdy opens it
 explains what it does and asks before connecting to Claude Code or starting at
-login.
+login, which plan to show (Claude or Codex), which corner to sit in and lets you
+pick a skin.
 
 > [!NOTE]
 > **Edge blocks the download?** New apps aren't "commonly downloaded" yet. Open

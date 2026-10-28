@@ -12,7 +12,7 @@ from clawdy_i18n import t as tr
 MW, PAD = 400, 12
 TILE, GAP = 44, 47
 PER_ROW = (MW - 2 * PAD + (GAP - TILE)) // GAP
-PREVIEW_H = 104
+PREVIEW_H = 118
 
 
 class Creator:
@@ -24,6 +24,7 @@ class Creator:
         self.w, self.k = w, w.k
         self.closed, self.hover, self.hits = False, None, []
         self.flash_text, self.flash_until = "", 0.0
+        self.t0, self.pop_at = time.time(), -1.0
         self.win = tk.Toplevel(w.root)
         self.h = self.layout_height()
         pw, ph = round(MW * self.k), round(self.h * self.k)
@@ -89,9 +90,8 @@ class Creator:
         px0, py0, px1, py1 = PAD, 34, MW - PAD, 34 + PREVIEW_H
         self.round_rect(c, S(px0), S(py0), S(px1), S(py1), S(10), fill=hx((0.15, 0.135, 0.125)), outline="")
         ch = w.character_now()
-        bob = math.sin(time.time() * 2.2) * 1.5
-        blink = (time.time() % 3.7) < 0.14
-        w.draw_still(c, S(MW / 2), S(py0 + PREVIEW_H / 2 + 6 + bob), 1.3 * k, ch, "closed" if blink else "open")
+        pose = self.pose(time.time() - self.t0)
+        w.draw_still(c, S(MW / 2), S(py0 + PREVIEW_H / 2 + 14), 1.3 * k, ch, **pose)
         name = next((tr("costume." + p) for p in character.PRESET_ORDER if character.matches(ch, p)), None)
         if w.costume_pref == "auto":
             name = tr("costume.auto") + " · " + tr("costume." + w.costume())
@@ -137,6 +137,46 @@ class Creator:
                     self.tile(kind, opt, x1, y1)
                     self.hits.append(((x1, y1, x1 + TILE, y1 + TILE), lambda kind=kind, opt=opt: self.set(kind, opt)))
                     self.hits[-1] = (self.hits[-1][0], self.hits[-1][1], (kind, opt))
+
+    def pose(self, t):
+        """A little show that loops: idle, wave, jump, look around, spin, squash."""
+        p = dict(eye="open", arm_l=0.0, arm_r=0.0, eye_dx=0.0, eye_dy=0.0, step=None, tuck=False,
+                 dy=0.0, sx=1.0, sy=1.0, rot=0.0)
+        q = t % 12.0
+        if (t % 3.7) < 0.14 and q < 9:
+            p["eye"] = "closed"
+        if q < 3.0:                                      # idle: breathe and bob
+            p["dy"] = math.sin(t * 2.2) * 1.5
+            p["sy"] = 1 + math.sin(t * 2.2) * 0.012
+        elif q < 5.0:                                    # wave
+            p["arm_r"] = -9 + math.sin(t * 16) * 4
+            p["eye"] = "happy"
+        elif q < 7.0:                                    # two hops
+            h = abs(math.sin((q - 5.0) * math.pi))
+            p["dy"] = -h * 17
+            p["sy"], p["sx"] = 1 + 0.08 * h, 1 - 0.05 * h
+            p["tuck"] = h > 0.35
+            if h < 0.08:
+                p["sy"], p["sx"] = 0.9, 1.08
+        elif q < 9.0:                                    # look around
+            p["eye_dx"] = -2.5 if (q - 7.0) < 0.7 else (2.5 if (q - 7.0) < 1.4 else 0.0)
+            p["step"] = int(t * 2) % 2 if (q - 7.0) > 1.4 else None
+        elif q < 10.5:                                   # spin
+            a = (q - 9.0) / 1.5 * 2 * math.pi
+            p["sx"] = math.cos(a)
+            p["eye"] = "back" if p["sx"] < 0 else "open"
+            p["dy"] = -abs(math.sin(a)) * 4
+        else:                                            # stretch and yawn
+            s = math.sin((q - 10.5) / 1.5 * math.pi)
+            p["sy"], p["sx"] = 1 + 0.16 * s, 1 - 0.08 * s
+            p["arm_l"] = p["arm_r"] = -8 * s
+            p["eye"] = "closed" if s > 0.3 else "open"
+        since = time.time() - self.pop_at
+        if 0 <= since < 0.3:                             # something was just picked: a little pop
+            b = math.sin(since / 0.3 * math.pi)
+            p["sy"] *= 1 + 0.18 * b
+            p["sx"] *= 1 + 0.12 * b
+        return p
 
     def tile(self, slot, name, x1, y1):
         """Clawdy wearing just this part (or nothing), small."""
@@ -213,6 +253,7 @@ class Creator:
 
     def apply(self, ch):
         self.w.set_character(ch)
+        self.pop_at = time.time()
         self.draw()
 
     def import_png(self):
@@ -259,8 +300,8 @@ class Creator:
     def tick(self):
         if self.closed:
             return
-        self.draw()                                    # the preview breathes and blinks
-        self.win.after(120, self.tick)
+        self.draw()                                    # the preview plays its little show
+        self.win.after(50, self.tick)
 
     def close(self):
         if self.closed:
