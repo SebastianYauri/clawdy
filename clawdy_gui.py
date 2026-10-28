@@ -3166,8 +3166,12 @@ class Widget:
         src = (st.data or {}).get("source")
         title = {"codex": "panel.title_codex", "agy": "panel.title_agy"}.get(src, "panel.title")
         self.text(x0, 9, tr(title), hx(DIM, a), 5, bold=True)
-        if not rows:
-            self.text(px + PW / 2, H / 2, self.status_msg(), hx(DIM, a), 7, anchor="center")
+        if not rows:                      # no limits to show: the status, wrapped to fit the panel
+            import textwrap
+            lines = textwrap.wrap(self.status_msg(), 30)[:4] or [""]
+            y0 = H / 2 - (len(lines) - 1) * 6
+            for i, line in enumerate(lines):
+                self.text(px + PW / 2, y0 + i * 12, line, hx(DIM, a), 6 if len(lines) > 1 else 7, anchor="center")
         shown = rows[:4]
         tight = len(shown) > 3            # with 4 limits the reset goes on the same line
         gap = 21 if tight else 27
