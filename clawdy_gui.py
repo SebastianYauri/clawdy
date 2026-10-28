@@ -1111,6 +1111,7 @@ class Widget:
             ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in PopupMenu.COSTUMES],
              lambda: w.costume_pref, w.set_costume, 3),
             ("action", tr("menu.design"), w.design_costumes),
+            ("action", tr("menu.codexpet"), w.install_codex_pet),
         ]
 
     def design_costumes(self):
@@ -1123,6 +1124,22 @@ class Widget:
         except Exception as e:
             self.log("design", e)
             self.flash(tr("share.failed"), 4)
+
+    def install_codex_pet(self):
+        """Copy the bundled Clawdy pet into Codex's pets folder (Codex app and CLI load it with /pet)."""
+        import shutil
+        if not os.path.isdir(codex.HOME):
+            self.flash(tr("codexpet.none"), 5)
+            return
+        src = cs.resource("assets", "codex-pet")
+        try:
+            for name in os.listdir(src):
+                shutil.copytree(os.path.join(src, name), os.path.join(codex.HOME, "pets", name), dirs_exist_ok=True)
+        except Exception as e:
+            self.log("codex pet", e)
+            self.flash(tr("share.failed"), 4)
+            return
+        self.flash(tr("codexpet.done"), 10)
 
     def open_settings(self):
         """The settings window: next to Clawdy, or at the pointer when Clawdy is hidden."""

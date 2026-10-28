@@ -65,6 +65,8 @@ def main():
         shutil.copy2(os.path.join(SRC, "assets", asset), os.path.join(DEST, "assets", asset))
     shutil.rmtree(os.path.join(DEST, "assets", "skins"), ignore_errors=True)
     shutil.copytree(os.path.join(SRC, "assets", "skins"), os.path.join(DEST, "assets", "skins"))
+    shutil.rmtree(os.path.join(DEST, "assets", "codex-pet"), ignore_errors=True)
+    shutil.copytree(os.path.join(SRC, "assets", "codex-pet"), os.path.join(DEST, "assets", "codex-pet"))
     add_to_menu(main_py)
     subprocess.Popen([sys.executable, main_py], start_new_session=True,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

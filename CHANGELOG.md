@@ -5,6 +5,9 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.4
 
+- **Clawdy as a Codex Pet.** `codex-pet/` holds Clawdy (and each costume) in
+  the Codex Pets format, rendered from Clawdy's own animations. **Settings… →
+  Install as a Codex pet** copies it into `~/.codex/pets`; then `/pet` in Codex.
 - **Codex support.** Clawdy now works with OpenAI's Codex CLI: it reads your
   ChatGPT plan's 5-hour and weekly limits and what Codex is doing from the
   session files Codex writes (`~/.codex/sessions`), with no setup, network or

@@ -101,6 +101,9 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
   doing straight from the session files Codex already writes: no setup, no key.
   It picks Codex by itself when Claude Code isn't installed, or choose
   **Settings… → Usage from**.
+- **A Codex pet too.** Clawdy ships as a [Codex Pet](codex-pet/): **Settings… →
+  Install as a Codex pet** and it shows up inside the Codex app and CLI with
+  `/pet`, with every costume available as a separate pet.
 - **Free and private.** No API key, no extra cost, no servers, no telemetry.
 - **English and Spanish**, following your system language.
 

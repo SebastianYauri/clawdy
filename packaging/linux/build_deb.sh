@@ -21,6 +21,8 @@ install -m 644 "$ROOT/assets/icon.png" "$ROOT/assets/alert.wav" "$ROOT/assets/do
                "$PKG/usr/lib/clawdy/assets/"
 install -d "$PKG/usr/lib/clawdy/assets/skins"
 install -m 644 "$ROOT"/assets/skins/*.png "$PKG/usr/lib/clawdy/assets/skins/"
+install -d "$PKG/usr/lib/clawdy/assets/codex-pet/clawdy"
+install -m 644 "$ROOT"/assets/codex-pet/clawdy/* "$PKG/usr/lib/clawdy/assets/codex-pet/clawdy/"
 install -m 644 "$ROOT/assets/icon.png" "$PKG/usr/share/icons/hicolor/256x256/apps/clawdy.png"
 install -m 644 "$ROOT/LICENSE" "$PKG/usr/share/doc/clawdy/copyright"
 
