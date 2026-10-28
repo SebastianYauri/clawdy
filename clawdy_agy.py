@@ -103,8 +103,56 @@ def state_for(ev, tool):
     return None
 
 
+QUOTA_FILE = os.path.join(cs.cache_dir(), "agy-quota.json")
+QUOTA_EVERY = 60
+
+
+def ask_server_quota():
+    """From inside a hook: the CLI hands its children the address of its local server and a
+    one-launch CSRF token; use them (in memory only) to read the quota summary and save just
+    the numbers. Any problem is ignored: the hook must never fail or slow the CLI down."""
+    token = os.environ.get("ANTIGRAVITY_CSRF_TOKEN")
+    port = os.environ.get("ANTIGRAVITY_SIDECAR_WEB_PORT")
+    addr = os.environ.get("ANTIGRAVITY_LS_ADDRESS")
+    if not token or not (port or addr):
+        return
+    try:
+        if os.path.getmtime(QUOTA_FILE) > time.time() - QUOTA_EVERY:
+            return                                          # fresh enough
+    except OSError:
+        pass
+    import urllib.request
+    host = addr if addr and "://" in addr else "http://127.0.0.1:%s" % (port or addr.rsplit(":", 1)[-1])
+    url = host.rstrip("/") + "/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary"
+    req = urllib.request.Request(url, data=b"{}", method="POST", headers={
+        "Content-Type": "application/json", "x-codeium-csrf-token": token})
+    try:
+        body = json.loads(urllib.request.urlopen(req, timeout=3).read().decode("utf-8", "replace"))
+    except Exception:
+        return
+    summary = body.get("quotaSummary") or body
+    buckets = summary.get("quotaBuckets") or body.get("quotaBuckets") or []
+    limits = []
+    for b in buckets:
+        try:
+            frac = float(b.get("remainingFraction", 1.0))
+        except (TypeError, ValueError):
+            continue
+        reset = b.get("resetTime")
+        label = b.get("refreshWindowLabel") or b.get("quotaBucketName") or ""
+        limits.append({"kind": "weekly_all" if "week" in str(label).lower() else "session",
+                       "percent": round(max(0.0, min(1.0, 1 - frac)) * 100, 1), "resets_at": reset,
+                       "name": b.get("quotaBucketName") or label})
+    if limits:
+        cs.write_json(QUOTA_FILE, {"limits": limits, "updated": time.time(), "raw_keys": sorted(summary.keys())[:20]})
+
+
 def handle(ev, data):
     """Called by the hook: one Antigravity event → the session's state file."""
+    try:
+        ask_server_quota()
+    except Exception:
+        pass
     sid = "agy-" + "".join(c for c in str(data.get("conversationId") or "x") if c.isalnum() or c in "-_")[:72]
     os.makedirs(cs.SESSIONS, exist_ok=True)
     path = os.path.join(cs.SESSIONS, sid + ".json")
@@ -143,6 +191,25 @@ def _logs():
 
 
 def usage():
+    """The quota the hook saved from the CLI's own server (fresh within a day), else a full bar
+    while the CLI log reports the quota exhausted, else None."""
+    try:
+        q = json.load(open(QUOTA_FILE))
+        if time.time() - q.get("updated", 0) < 24 * 3600 and q.get("limits"):
+            limits = []
+            for l in q["limits"]:
+                reset = l.get("resets_at")
+                if isinstance(reset, (int, float)):
+                    reset = datetime.fromtimestamp(reset, timezone.utc).isoformat()
+                limits.append({"kind": l["kind"], "percent": l["percent"], "resets_at": reset,
+                               "scope": {"model": {"display_name": l.get("name")}} if l.get("name") else None})
+            return {"limits": limits, "source": "agy", "updated": q["updated"]}
+    except Exception:
+        pass
+    return usage_from_log()
+
+
+def usage_from_log():
     """{"limits": [...]} with a full bar while the CLI reports its quota exhausted, else None."""
     pat = re.compile(r"^[A-Z](\d{2})(\d{2}) (\d{2}):(\d{2}):(\d{2})\.\d+.*quota reached.*?Resets in (?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?",
                      re.I)
