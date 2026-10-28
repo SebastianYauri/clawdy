@@ -104,7 +104,8 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
   Claude Code? Clawdy reads Codex's 5-hour and weekly limits and what it's
   doing straight from the session files Codex already writes: no setup, no key.
   It picks Codex by itself when Claude Code isn't installed, or choose
-  **Settings… → Usage from**.
+  **Settings… → Usage from**. The **+** button and the chats tree then open Codex
+  instead (the app if you have it, else the CLI).
 - **A Codex pet too.** Clawdy ships as a [Codex Pet](codex-pet/): **Settings… →
   Install as a Codex pet** and it shows up inside the Codex app and CLI with
   `/pet`, with every costume available as a separate pet.

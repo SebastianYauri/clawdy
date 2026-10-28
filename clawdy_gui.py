@@ -291,6 +291,9 @@ def fetch_codex(st):
     data = codex.usage()
     st.need, st.retry_at = None, 0
     if not data:
+        if not (codex.installed() or cs.codex_cli_path() or cs.codex_app()):
+            st.need, st.error = "codex", tr("need.codex")
+            return "auth"
         st.error = tr("error.codex_none")
         return "error"
     st.data, st.error, st.updated = data, None, time.time()
@@ -974,7 +977,11 @@ class Widget:
             return
         if ev.y / self.k > INFO_Y - 9 and self.no_usage() and not self.setup_phase:
             self._drag = False
-            self.setup_claude_code()
+            if self.st.need == "codex":
+                import webbrowser
+                webbrowser.open(cs.CODEX_WEB)
+            else:
+                self.setup_claude_code()
             return
         if self.on_plus(ev.x / self.k, ev.y / self.k):
             self._drag = False
@@ -1041,9 +1048,20 @@ class Widget:
         self.e = clamp(self.e + step) if target else clamp(self.e - step)
         self.place_panel()
 
+    def chat_key(self, kind):
+        """Which "new chat" label applies: Codex, the Claude app or claude.ai."""
+        if source() == "codex":
+            return kind + ".chat_codex" if kind == "menu" else "chat.codex"
+        if kind == "menu":
+            return "menu.chat_app" if self.has_app else "menu.chat_web"
+        return "chat.app" if self.has_app else "chat.web"
+
     def new_chat(self):
         self.plus_click = time.time()
-        cs.open_new_chat(self.has_app)
+        if source() == "codex":
+            cs.open_new_codex_chat()
+        else:
+            cs.open_new_chat(self.has_app)
         self.force, self.act_t = "wave", 0.0                 # Clawdy waves
         for i in range(4):
             self.spawn("heart", SCENE_W / 2 + (i - 1.5) * 16, 40, (i - 1.5) * 10, -45, 1.4)
@@ -1070,8 +1088,15 @@ class Widget:
         if self.popup_menu:
             self.popup_menu.close()
         now = time.time()
-        opened = sessions.open_sessions(now)
-        recent = sessions.recent_sessions(exclude={s["id"] for s in opened}, limit=5)
+        codex_mode = source() == "codex"
+        if codex_mode:
+            opened = [dict(s, id=s["sid"], project=os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else "Codex",
+                           pid=None) for s in codex.sessions(now).values() if s.get("sid")]
+            opened.sort(key=lambda s: -s["ts"])
+            recent = codex.recent(exclude={s["id"] for s in opened}, limit=5)
+        else:
+            opened = sessions.open_sessions(now)
+            recent = sessions.recent_sessions(exclude={s["id"] for s in opened}, limit=5)
         projects = sessions.recent_projects(recent, opened)
 
         def age(ts):
@@ -1088,10 +1113,14 @@ class Widget:
             return text if len(text) <= n else text[:n - 1] + "…"
 
         def focus(s):
-            if not cs.focus_session(s["pid"]):
+            if codex_mode:                   # no window to raise: reopen the thread in a terminal
+                sessions.resume_codex(s)
+            elif not cs.focus_session(s["pid"]):
                 self.flash(tr("sessions.cant_focus"), 4)
 
-        items = [("title", tr("sessions.title"), "")]
+        resume = sessions.resume_codex if codex_mode else sessions.resume
+        new_in = sessions.new_codex_in if codex_mode else sessions.new_chat_in
+        items = [("title", "Codex" if codex_mode else tr("sessions.title"), "")]
         if opened:
             items.append(("section", tr("sessions.open")))
             for s in opened[:5]:
@@ -1102,12 +1131,12 @@ class Widget:
         if recent:
             items.append(("section", tr("sessions.recent")))
             for s in recent:
-                items.append(("action", short(s["title"], 25), lambda s=s: sessions.resume(s), None,
+                items.append(("action", short(s["title"], 25), lambda s=s: resume(s), None,
                               "%s · %s" % (short(s["project"], 12), age(s["ts"])), None, None))
         if projects:
             items.append(("pills", tr("sessions.new"),
                           [(p, "+ " + short(os.path.basename(p) or p, 10)) for p in projects],
-                          lambda: None, sessions.new_chat_in, 3, "close"))
+                          lambda: None, new_in, 3, "close"))
         if len(items) == 1:
             items.append(("note", tr("sessions.none")))
         self.popup_menu = PopupMenu(self, x, y, items=items, width=300)
@@ -1331,7 +1360,7 @@ class Widget:
 
     def no_usage(self):
         """No Claude Code session to read usage from: Clawdy works, the rings stay empty."""
-        return self.st.need in ("install", "login")
+        return self.st.need in ("install", "login", "codex")
 
     def start_intro(self):
         self.ready, self.intro_t0, self.fill_t0, self.ball = True, time.time(), None, None
@@ -2807,8 +2836,7 @@ class Widget:
         mid = cx + CW / 2
         upd = self.update_label()
         if near:
-            self.text(mid, INFO_Y, tr("chat.app") if self.has_app else tr("chat.web"),
-                      hx(TXT), 6, anchor="center")
+            self.text(mid, INFO_Y, tr(self.chat_key("short")), hx(TXT), 6, anchor="center")
         elif getattr(self, "near_pin", False):
             self.text(mid, INFO_Y, tr("pin.hint_off" if self.v_lock.get() else "pin.hint_on"),
                       hx(TXT), 6, anchor="center")
@@ -3055,7 +3083,7 @@ class PopupMenu:
             self.MW = width
         self.items = items or [
             ("title", "Clawdy", "v" + VERSION),
-            ("action", tr("menu.chat_app" if w.has_app else "menu.chat_web"), w.new_chat),
+            ("action", tr(w.chat_key("menu")), w.new_chat),
             ("action", tr("menu.share"), w.share),
             ("action", tr("menu.refresh"), w.refresh),
             ("action", tr("menu.updates"), lambda: w.check_updates(True)),

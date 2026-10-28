@@ -14,6 +14,10 @@ All notable changes to Clawdy are listed here. Versions follow
   key. Animations, pace, alerts and "Codex finished" notifications all work.
   It's chosen automatically when Claude Code isn't installed, or pick it in
   **Settings… → Usage from** (Auto · Claude · Codex).
+  With Codex as the source, **+** opens a new Codex chat (the Codex app where
+  there is one, else the CLI in a terminal) and clicking Clawdy lists your
+  Codex threads: open ones with what they're doing, recent ones to resume, and
+  new chats in recent projects.
 - **Redrawn costumes.** The witch, Santa, Frankenstein and vampire costumes are
   now pixel art drawn at twice Clawdy's resolution, with outlines, shading and
   highlights (the vampire's cape has a high collar and a crimson lining).

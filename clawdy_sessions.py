@@ -120,6 +120,22 @@ def _claude_in(cwd, args=""):
     return "cd %s && %s %s" % (q(cwd), q(path), args)
 
 
+def _codex_in(cwd, args=""):
+    path = cs.codex_cli_path() or "codex"
+    if cs.WIN:
+        return "Set-Location -LiteralPath '%s'; & '%s' %s" % (cwd.replace("'", "''"), path, args)
+    q = lambda s: "'%s'" % s.replace("'", "'\\''")
+    return "cd %s && %s %s" % (q(cwd), q(path), args)
+
+
+def resume_codex(session):
+    return cs.open_terminal(_codex_in(session["cwd"], "resume " + session["id"]))
+
+
+def new_codex_in(cwd):
+    return cs.open_terminal(_codex_in(cwd))
+
+
 def resume(session):
     """Reopen a past chat in a new terminal."""
     return cs.open_terminal(_claude_in(session["cwd"], "--resume " + session["id"]))

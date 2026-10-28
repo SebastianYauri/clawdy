@@ -72,7 +72,7 @@ def _parse(path):
     if hit and hit[0] == st.st_mtime and hit[1] == st.st_size:
         return hit[2]
     out = {"limits": None, "limits_ts": 0, "state": None, "ts": 0, "started": 0, "done": 0,
-           "ask": 0, "cwd": None, "id": os.path.basename(path)[:-6]}
+           "ask": 0, "cwd": None, "id": os.path.basename(path)[:-6], "sid": None, "title": None}
     try:
         with open(path, "rb") as f:
             if st.st_size > TAIL:
@@ -92,9 +92,18 @@ def _parse(path):
         state = None
         if t == "turn_context" and p.get("cwd"):
             out["cwd"] = p["cwd"]
-        elif t == "session_meta" and p.get("cwd") and not out["cwd"]:
-            out["cwd"] = p["cwd"]
+        elif t == "session_meta":
+            out["sid"] = p.get("id") or p.get("session_id")
+            if p.get("cwd") and not out["cwd"]:
+                out["cwd"] = p["cwd"]
         elif t == "event_msg":
+            if pt == "item_completed" and not out["title"]:
+                item = p.get("item") or {}
+                if item.get("type") == "UserMessage":
+                    text = " ".join(c.get("text", "") for c in item.get("content") or [] if isinstance(c, dict))
+                    text = " ".join(text.split())
+                    if text and not text.startswith("<"):
+                        out["title"] = text[:120]
             if pt == "token_count" and p.get("rate_limits"):
                 out["limits"], out["limits_ts"] = p["rate_limits"], ts
             elif pt == "task_started":
@@ -154,8 +163,26 @@ def sessions(now=None):
         s = _parse(path)
         if s:
             took = max(0, s["done"] - s["started"]) if s["started"] and s["done"] >= s["started"] else 0
-            out["codex-" + s["id"]] = {"state": s["state"], "ts": s["ts"], "started": s["started"],
+            out["codex-" + s["id"]] = {"sid": s["sid"], "state": s["state"], "ts": s["ts"], "started": s["started"],
                                        "done": s["done"], "took": took,   # 0 when the start fell out of the tail
                                        "ask": s["ask"], "ask_kind": "permission" if s["ask"] else None,
                                        "cwd": s["cwd"]}
+    return out
+
+
+def recent(limit=6, exclude=()):
+    """[{id, cwd, project, title, ts}] of the latest chats, newest first (for the chats tree)."""
+    out = []
+    for path in _files(30):
+        s = _parse(path)
+        if not s or not s["sid"] or s["sid"] in exclude or not s["title"] or not s["cwd"]:
+            continue
+        try:
+            ts = os.path.getmtime(path)
+        except OSError:
+            continue
+        out.append({"id": s["sid"], "cwd": s["cwd"], "project": os.path.basename(os.path.normpath(s["cwd"])),
+                    "title": s["title"], "ts": ts})
+        if len(out) >= limit:
+            break
     return out

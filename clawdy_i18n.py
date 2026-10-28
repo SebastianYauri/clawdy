@@ -85,6 +85,9 @@ STRINGS = {
 
     "menu.chat_app": ("New chat in the app", "Nuevo chat en la app"),
     "menu.chat_web": ("New chat on claude.ai", "Nuevo chat en claude.ai"),
+    "menu.chat_codex": ("New chat in Codex", "Nuevo chat en Codex"),
+    "chat.codex": ("chat in Codex", "chat en Codex"),
+    "need.codex": ("Click to get Codex", "Clic para instalar Codex"),
     "menu.refresh": ("Refresh usage now", "Actualizar uso ahora"),
     "menu.updates": ("Check for updates", "Buscar actualizaciones"),
     "menu.hooks": ("React to Claude Code", "Reaccionar a Claude Code"),

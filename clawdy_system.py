@@ -355,6 +355,59 @@ INSTALL_SH = "curl -fsSL https://claude.ai/install.sh | bash"
 INSTALL_PS = "irm https://claude.ai/install.ps1 | iex"
 
 
+CODEX_WEB = "https://chatgpt.com/codex"
+
+
+def codex_cli_path():
+    """Where the Codex CLI is, or None (GUI apps often get a short PATH)."""
+    found = shutil.which("codex")
+    if found:
+        return found
+    names = ("codex.cmd", "codex.exe") if WIN else ("codex",)
+    for d in (os.path.join(HOME, ".local", "bin"), "/opt/homebrew/bin", "/usr/local/bin",
+              os.path.join(HOME, ".npm-global", "bin"), os.path.join(os.environ.get("APPDATA", ""), "npm")):
+        for n in names:
+            p = os.path.join(d, n)
+            if os.path.isfile(p):
+                return p
+    return None
+
+
+def codex_app():
+    """The Codex desktop app, if installed (macOS and Windows only)."""
+    if MAC:
+        for p in ("/Applications/Codex.app", os.path.join(HOME, "Applications", "Codex.app")):
+            if os.path.isdir(p):
+                return p
+    if WIN:
+        for p in (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Codex", "Codex.exe"),
+                  os.path.join(os.environ.get("LOCALAPPDATA", ""), "Codex", "Codex.exe"),
+                  os.path.join(os.environ.get("PROGRAMFILES", ""), "Codex", "Codex.exe")):
+            if os.path.isfile(p):
+                return p
+    return None
+
+
+def open_new_codex_chat():
+    """The Codex app if there is one, else the CLI in a terminal, else the web."""
+    app = codex_app()
+    try:
+        if app and MAC:
+            subprocess.Popen(["open", "-a", app])
+            return True
+        if app and WIN:
+            os.startfile(app)
+            return True
+    except Exception:
+        pass
+    cli = codex_cli_path()
+    if cli and open_terminal(('& "%s"' % cli) if WIN else "'%s'" % cli.replace("'", "'\\''")):
+        return True
+    import webbrowser
+    webbrowser.open(CODEX_WEB)
+    return False
+
+
 def claude_code_path():
     """Where the Claude Code CLI is, or None. GUI apps often get a short PATH, so look around."""
     found = shutil.which("claude")

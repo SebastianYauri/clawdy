@@ -71,7 +71,7 @@ class Tray:
             P.Menu.SEPARATOR,
             Item(lambda item: tr("tray.hide") if w.visible() else tr("tray.show"),
                  call(w.toggle_visible), default=True),
-            Item(tr("menu.chat_app" if w.has_app else "menu.chat_web"), call(w.new_chat)),
+            Item(lambda item: tr(w.chat_key("menu")), call(w.new_chat)),
             Item(tr("menu.share"), call(w.share)),
             Item(tr("menu.refresh"), call(w.refresh)),
             Item(tr("menu.updates"), call(lambda: w.check_updates(True))),
