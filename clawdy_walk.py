@@ -23,8 +23,8 @@ MAC = sys.platform == "darwin"
 
 ORANGE, ORANGE_D, DARK = "#d97757", "#b35c42", "#1a1412"
 ROPE = "#c08b52"
-GW, GH = 16, 12                       # the sprite grid, in sprite pixels
-OX, OY = 1, 3                         # where the 14x9 sprite sits in the grid
+GW, GH = 16, 16                       # the sprite grid, in sprite pixels (one = one Clawdy pixel)
+OX, OY = 1, 7                         # where the 14x9 sprite sits in the grid (room for hats above)
 
 
 def ease(t):
@@ -133,37 +133,38 @@ def ghost(frame, boo=False, blink=False, look=0):
     return R
 
 
-def dress(costume, kind):
-    """What a costume adds on top of the plain sprite."""
-    if costume == "witch":
-        purple, light, band = "#8c4fd1", "#c7a6f5", "#f59428"
-        return [(OX, OY - 1, 14, 1, light), (OX + 1, OY - 1, 12, 1, "#6a389f"),
-                (OX + 4, OY - 2, 6, 1, purple), (OX + 5, OY - 3, 4, 1, purple), (OX + 8, OY - 3, 2, 1, purple),
-                (OX + 4, OY - 1, 6, 1, band)]
-    if costume == "santa":
-        red, white = "#db2929", "#f7f7f7"
-        return [(OX + 2, OY - 1, 10, 1, white), (OX + 3, OY - 2, 8, 1, red), (OX + 5, OY - 3, 5, 1, red),
-                (OX + 10, OY - 3, 2, 2, white)]
-    if costume == "frank":
-        hair, metal = "#18151b", "#a2a5ad"
-        R = [(OX + 2, OY - 1, 10, 2, hair)]
-        R += [(OX + x, OY + 1, 1, 1, hair) for x in (3, 6, 9)]       # jagged fringe
-        R += [(OX + 1, OY + 5, 1, 1, metal), (OX + 12, OY + 5, 1, 1, metal)]   # neck bolts
-        return R
-    if costume == "pumpkin":
-        rib, lit = "#c2603f", "#ffd75a"
-        return [(OX + 5, OY, 1, 7, rib), (OX + 8, OY, 1, 7, rib), (OX + 6, OY - 1, 2, 1, "#4f8c35"),
-                (OX + 4, OY + 2, 2, 2, lit), (OX + 8, OY + 2, 2, 2, lit), (OX + 4, OY + 5, 6, 1, lit)]
-    return []
-
-
-def pose(kind, frame=0, look=0, blink=False, costume="none", col=None):
-    """Rectangles (x, y, w, h, color) in sprite pixels on the GW x GH grid."""
+def pose(kind, frame=0, look=0, blink=False, costume="none", col=None, wear=((), ())):
+    """Rectangles (x, y, w, h, color) in sprite pixels on the GW x GH grid.
+    `wear` is (behind, in front): the character's parts, from wear_from()."""
     if kind == "bat":
         return bat(frame, blink)
     if kind in ("ghost", "boo"):
         return ghost(frame, kind == "boo", blink, look)
-    return plain(kind, frame, look, blink, col) + dress(costume, kind) + (broom() if kind == "broom" else [])
+    back, front = wear
+    return list(back) + plain(kind, frame, look, blink, col) + list(front) + (broom() if kind == "broom" else [])
+
+
+def wear_from(widget):
+    """The character's parts as grid rectangles: every 2×2 block of a 32×32 part
+    image is one Clawdy pixel, so they land exactly on the walking sprite."""
+    import clawdy_character as character
+    ch = widget.character_now()
+    out = []
+    for layer in ("back", "front"):
+        rects = []
+        for path in character.layers(ch, layer):
+            try:
+                pix = widget.skins.pixels(path)
+            except Exception:
+                continue
+            for (sx, sy), colr in pix.items():
+                if sx % 2 or sy % 2:
+                    continue                           # one sample per Clawdy pixel
+                x, y = OX + (sx - 2) // 2, OY + (sy - 12) // 2
+                if 0 <= x < GW and 0 <= y < GH:
+                    rects.append((x, y, 1, 1, colr))
+        out.append(rects)
+    return tuple(out)
 
 
 def broom():
@@ -220,6 +221,7 @@ class Walk:
         self.wave_until = 0.0
         self.costume = widget.costume()
         self.colors = widget.body_colors()
+        self.wear = wear_from(widget)
         self.shaper = None
         self._last_key = None
 
@@ -298,7 +300,7 @@ class Walk:
         blink = (self.t % 3.3) < 0.12
         if kind == "walk" and self.costume == "frank":
             kind = "stomp"
-        rects = pose(kind, frame, look, blink, self.costume, self.colors)
+        rects = pose(kind, frame, look, blink, self.costume, self.colors, self.wear)
         key = (kind, frame, look, blink)
         if key != self._last_key:
             self._last_key = key
