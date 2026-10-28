@@ -13,7 +13,8 @@ from datetime import datetime, timezone
 
 HOME = os.environ.get("CODEX_HOME") or os.path.join(os.path.expanduser("~"), ".codex")
 SESSIONS = os.path.join(HOME, "sessions")
-TAIL = 256 * 1024                 # only the end of a session file is read
+TAIL = 256 * 1024                 # only the end of a session file is read (plus its start, see HEAD)
+HEAD = 64 * 1024
 ACTIVE = 15 * 60                  # files touched this recently count as open sessions
 
 _cache = {}                       # path -> (mtime, size, parsed)
@@ -75,10 +76,14 @@ def _parse(path):
            "ask": 0, "cwd": None, "id": os.path.basename(path)[:-6], "sid": None, "title": None}
     try:
         with open(path, "rb") as f:
-            if st.st_size > TAIL:
+            if st.st_size > TAIL + HEAD:         # the start (session id, title) and the end (what's happening now)
+                head = f.read(HEAD)
+                head = head[:head.rfind(b"\n") + 1]
                 f.seek(st.st_size - TAIL)
                 f.readline()                     # skip the cut line
-            data = f.read().decode("utf-8", "replace")
+                data = (head + f.read()).decode("utf-8", "replace")
+            else:
+                data = f.read().decode("utf-8", "replace")
     except OSError:
         return None
     for line in data.splitlines():
