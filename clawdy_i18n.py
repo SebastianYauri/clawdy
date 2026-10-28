@@ -130,6 +130,7 @@ STRINGS = {
     "task.permission": ("{where} · waiting for your permission", "{where} · espera tu permiso"),
     "task.ask_short": ("Needs you!", "¡Te necesita!"),
     "menu.lock": ("Pin in place", "Fijar en su lugar"),
+    "menu.pet": ("Pet mode (no card, roams the bottom)", "Modo mascota (sin cuadro, pasea abajo)"),
     "pin.on": ("Pinned", "Fijado"),
     "pin.off": ("Free to move", "Se puede mover"),
     "pin.hint_on": ("Pin in place", "Fijar en su lugar"),

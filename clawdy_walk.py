@@ -14,6 +14,7 @@ transparency on macOS, the X SHAPE extension on Linux) and the rope is a thin
 window of its own, so nothing ever has to be resized smoothly but the rope.
 """
 import math
+import random
 import re
 import subprocess
 import sys
@@ -219,6 +220,7 @@ class Walk:
         self.t = 0.0
         self.i = 0
         self.wave_until = 0.0
+        self.trail = []
         self.costume = widget.costume()
         self.colors = widget.body_colors()
         self.wear = wear_from(widget)
@@ -294,14 +296,17 @@ class Walk:
     def poke(self, ev=None):
         self.wave_until = self.t + 1.2
 
-    def draw(self, kind, x, y, frame=0, look=0):
+    def draw(self, kind, x, y, frame=0, look=0, lean=0.0, extra=()):
         if self.t < self.wave_until and kind in ("walk", "stand", "look"):
             kind = "wave"
         blink = (self.t % 3.3) < 0.12
         if kind == "walk" and self.costume == "frank":
             kind = "stomp"
         rects = pose(kind, frame, look, blink, self.costume, self.colors, self.wear)
-        key = (kind, frame, look, blink)
+        if lean:                                 # shear: the top drifts one way, the feet the other
+            rects = [(rx + round(lean * (OY + 3 - (ry + rh / 2)) / 3), ry, rw, rh, col) for rx, ry, rw, rh, col in rects]
+        rects = list(extra) + rects
+        key = (kind, frame, look, blink, round(lean, 1), len(extra))
         if key != self._last_key:
             self._last_key = key
             c, p = self.canvas, self.p
@@ -368,7 +373,13 @@ class Walk:
             self.alpha(1.0 if boo else 0.78 + 0.12 * math.sin(self.t * 4))
             self.draw("boo" if boo else "ghost", x, y + math.sin(self.t * 3) * 5 * k, int(self.t * 4))
         elif c == "witch":
-            self.draw("broom", x, y + math.sin(self.t * 4) * 3 * k)
+            lean = math.cos(q * 2 * math.pi) if name == "loop" else (-1 if name == "out" else 1) * 0.8
+            swoop = math.sin(self.t * 4) * 6 * k
+            self.trail = [(tx, ty, col, born) for tx, ty, col, born in self.trail if self.t - born < 0.5]
+            if int(self.t * 20) % 2 == 0:
+                self.trail.append((random.randint(10, 15), random.randint(OY + 4, OY + 9),
+                                   random.choice(("#c77dff", "#ffd75a", "#8cd9ff")), self.t))
+            self.draw("broom", x, y + swoop, lean=lean, extra=[(tx, ty, 1, 1, col) for tx, ty, col, _ in self.trail])
         else:                                    # pumpkin: bounces along
             hop = abs(math.sin(self.t * 4.2))
             self.draw("hop" if hop > 0.25 else "stand", x, y - hop * 46 * k)

@@ -640,6 +640,10 @@ class Widget:
         self._marks, self._asked, self._told = None, {}, {}
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.held = False                    # being carried around with the mouse
+        self.pet = bool(cs.load_config().get("pet", False))   # pet mode: no card, Clawdy roams the bottom edge
+        self.v_pet = tk.BooleanVar(value=self.pet)
+        self.pet_shaper, self.cur_act, self._pet_mon = None, None, None
+        self.part_fx = {}                    # per-slot (dx, dy, rot) wobble for the current frame
         self.skins = clawdy_skins.Skins(tk)  # costumes drawn in a pixel art editor, if any
         self.hist = self.load_history()      # [(time, {limit: (percent, resets_at)})] for the pace
         self._fresh = False                  # new usage arrived (set by the fetch thread)
@@ -733,12 +737,39 @@ class Widget:
         self.root.geometry("+%d+%d" % self.home_xy())
         self._placed = True
 
+    def pet_floor(self, x=None):
+        """(monitor rect, y of the window) so a pet stands on the bottom edge, above the taskbar/Dock."""
+        from clawdy_walk import _monitor_windows, _monitor_linux, _monitor_mac
+        k = self.k
+        h = round(H * k)
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        px = self.root.winfo_rootx() + 20 if x is None else x
+        py = max(0, min(sh - 1, self.root.winfo_rooty() + 20))
+        try:
+            if cs.WIN:
+                mon, floor = _monitor_windows(px, py)
+            elif cs.MAC:
+                mon = _monitor_mac(px, py, sw, sh)[0]
+                floor = mon[3] - round(70 * k)
+            else:
+                mon = _monitor_linux(px, py, sw, sh)[0]
+                floor = mon[3] - round(4 * k)
+        except Exception:
+            mon, floor = (0, 0, sw, sh), sh - round(4 * k)
+        return mon, floor - h + round(6 * k)          # the feet sit a little below the window's edge
+
     def home_xy(self):
         """Where Clawdy goes: where it was left, else the chosen corner (top right by default)."""
         k = self.k
         cw, h = round(CW * k), round(H * k)
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         cfg = cs.load_config()
+        if self.pet:
+            mon, y = self.pet_floor()
+            x = cfg.get("pet_x")
+            if x is None or not (mon[0] <= x <= mon[2] - cw):
+                x = mon[2] - cw - round(120 * k)
+            return int(x), y
         pos = cfg.get("pos")
         if pos and 0 <= pos[0] <= sw - cw and 0 <= pos[1] <= sh - h:
             return int(pos[0]), int(pos[1])
@@ -746,6 +777,58 @@ class Widget:
         x = round(30 * k) if "l" in corner else sw - cw - round(30 * k)
         y = round(60 * k) if "t" in corner else sh - h - round(60 * k)
         return x, y
+
+    def toggle_pet(self):
+        """Switch between the card and a free-roaming pet."""
+        self.pet = self.v_pet.get()
+        cs.update_config(pet=self.pet)
+        k = self.k
+        cw, h = round(CW * k), round(H * k)
+        self._skey = None
+        self.canvas.delete("all")
+        if self.pet:
+            self.intro_t0 = None
+            if self.walk:
+                self.end_walk()
+        else:
+            self.pet_shaper = None
+            self.round_corners(self.root, cw, h)
+        self.root.geometry("+%d+%d" % self.home_xy())
+        if self.tray:
+            self.tray.refresh()
+
+    def pet_shape(self):
+        """Linux: clip the window to what was drawn, so the desktop shows through."""
+        if self.keyed or not sys.platform.startswith("linux"):
+            return
+        try:
+            if self.pet_shaper is None:
+                self.pet_shaper = Shaper(self.root)
+            rects = []
+            for item in self.canvas.find_withtag("dyn"):
+                b = self.canvas.bbox(item)
+                if b and b[2] > b[0] and b[3] > b[1]:
+                    rects.append((b[0] - 1, b[1] - 1, b[2] - b[0] + 2, b[3] - b[1] + 2))
+            self.pet_shaper.set(rects or [(0, 0, 1, 1)])
+        except Exception:
+            self.pet_shaper = None
+
+    def pet_roam(self, dt):
+        """Pets wander along the bottom edge while they walk; the desktop walks are theirs already."""
+        if self.cur_act not in ("walk", "run", "zombie") or self._drag or self.col_in or self.panel_in \
+                or self.popup_menu or self.e > 0:
+            return
+        k = self.k
+        cw = round(CW * k)
+        if self._pet_mon is None or int(time.time()) % 30 == 0:
+            self._pet_mon = self.pet_floor()[0]
+        mon = self._pet_mon
+        x = self.root.winfo_x() + self.dir * (28 if self.cur_act == "walk" else 60) * k * dt
+        if x < mon[0] + 8 * k:
+            x, self.dir = mon[0] + 8 * k, 1
+        elif x > mon[2] - cw - 8 * k:
+            x, self.dir = mon[2] - cw - 8 * k, -1
+        self.root.geometry("+%d+%d" % (round(x), self.root.winfo_y()))
 
     def set_corner(self, corner):
         cs.update_config(corner=corner, pos=None)
@@ -983,11 +1066,11 @@ class Widget:
             else:
                 self.setup_claude_code()
             return
-        if self.on_plus(ev.x / self.k, ev.y / self.k):
+        if self.on_plus(ev.x / self.k, ev.y / self.k) and not self.pet:
             self._drag = False
             self.new_chat()
             return
-        if self.on_pin(ev.x / self.k, ev.y / self.k):
+        if self.on_pin(ev.x / self.k, ev.y / self.k) and not self.pet:
             self._drag = False
             self._press = None
             self.toggle_lock()
@@ -1021,8 +1104,8 @@ class Widget:
         if not (self.col_in or now - self.left_at < 0.15):
             self.mouse = None
         # Hovering the + while compact doesn't expand, so the button doesn't run away.
-        over_plus = self.e < 0.5 and self.mouse is not None and (self.on_plus(*self.mouse)
-                                                                 or self.on_pin(*self.mouse))
+        over_plus = self.e < 0.5 and self.mouse is not None and not self.pet and (self.on_plus(*self.mouse)
+                                                                                  or self.on_pin(*self.mouse))
         hot = inside and not over_plus
         if hot:
             self.out_since, self.in_since = None, self.in_since or now
@@ -1070,7 +1153,11 @@ class Widget:
         self._drag = False
         if self.held:
             self.held = False
-            cs.update_config(pos=[self.root.winfo_x(), self.root.winfo_y()])   # remembered across restarts
+            if self.pet:                         # pets live on the floor: keep the x, drop back down
+                cs.update_config(pet_x=self.root.winfo_x())
+                self.root.geometry("+%d+%d" % (self.root.winfo_x(), self.pet_floor()[1]))
+            else:
+                cs.update_config(pos=[self.root.winfo_x(), self.root.winfo_y()])   # remembered across restarts
             now = time.time()
             shaken = len([t for t in self._shakes if now - t < 1.2]) >= 4
             if shaken or math.hypot(*self._vel) > 2500:
@@ -1214,6 +1301,7 @@ class Widget:
             ("toggle", tr("menu.autostart"), w.v_start, w.toggle_start),
             ("toggle", tr("menu.pin"), w.v_pin, w.toggle_pin),
             ("toggle", tr("menu.lock"), w.v_lock, lambda: w.toggle_lock(flip=False)),
+            ("toggle", tr("menu.pet"), w.v_pet, w.toggle_pet),
             ("toggle", tr("menu.walks"), w.v_walks, w.toggle_walks),
             ("toggle", tr("menu.alerts"), w.v_alerts, w.toggle_alerts),
             ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
@@ -1363,6 +1451,9 @@ class Widget:
         return self.st.need in ("install", "login", "codex")
 
     def start_intro(self):
+        if self.pet:                                  # no rings to fill: just appear
+            self.ready, self.intro_t0, self.fill_t0, self.ball = True, None, None, None
+            return
         self.ready, self.intro_t0, self.fill_t0, self.ball = True, time.time(), None, None
 
     def fill(self):
@@ -1377,6 +1468,8 @@ class Widget:
 
     def maybe_walk(self, force=False):
         now = time.time()
+        if self.pet:                             # a pet is already out and about
+            return
         if self.walk or (not force and (now < self.next_trip or not self.v_walks.get())):
             return
         if not force and not self.using_claude(now):
@@ -1677,6 +1770,8 @@ class Widget:
             return
         now_pc = time.perf_counter()
         wdt, self._walk_clock = min(now_pc - self._walk_clock, 0.1), now_pc
+        if self.pet and self._placed:
+            self.pet_roam(wdt)
         if self.walk:
             if self.work in ("notification", "error") or self._drag or not self.v_walks.get():
                 self.end_walk()                 # Claude Code needs you: hurry home
@@ -1795,6 +1890,7 @@ class Widget:
         p = self.act_t / DUR
         if work:
             act = work
+        self.cur_act = act
         if time.time() < self.alarm_until:      # a limit alert beats everything else
             act = "alarm"
         if self.held:                           # …except being picked up
@@ -1807,6 +1903,7 @@ class Widget:
         dy = sx = sy = rot = 0.0
         glow = 0.6
         sx = sy = 1.0
+        self.part_fx = {}
         arm_l = arm_r = 0.0
         eye_dx, eye_dy, eye = self.dir * 1.0, 0.0, "open"
         step, tuck, props = None, False, []
@@ -1956,19 +2053,27 @@ class Widget:
                     self.spawn("heart", cx + self.pos + SW / 2, by - SH, 15, -30, 1.4)
                     self.emit = 0.7
 
-        elif act == "fly":                       # witch: broom flight inside the rings
+        elif act == "fly":                       # witch: a figure-eight swoop on the broom
             ang = p * 2 * math.pi
-            self.pos = math.sin(ang) * 12
-            self.dir = 1 if math.cos(ang) >= 0 else -1
-            dy = -5 - math.sin(ang * 2) * 4
-            rot = math.cos(ang) * 0.12
+            speed = math.cos(ang)                  # +1 flying right, -1 flying left
+            self.pos = math.sin(ang) * 13
+            self.dir = 1 if speed >= 0 else -1
+            dy = -8 - math.sin(ang * 2) * 7 - abs(math.sin(t * 9)) * 1.5
+            rot = speed * 0.26 - math.sin(ang * 2) * 0.08        # leans into the turns, nose down on dives
             tuck, eye = True, "happy"
-            arm_l = arm_r = -2
+            arm_l = arm_r = -3
+            self.part_fx["head"] = (-self.dir * 3 * abs(speed), 1.2 * abs(speed) + math.sin(t * 14) * 0.6,
+                                    -self.dir * 0.22 * abs(speed))     # the hat trails in the wind
             props.append("broomfly")
             if self.emit <= 0:
-                self.spawn("star", cx + self.pos - self.dir * 46, by + dy - 6,
-                           -self.dir * 20, random.uniform(-10, 10), 0.8, col=random.choice(MAGIC))
-                self.emit = 0.06
+                for i in range(2):
+                    self.spawn("star", cx + self.pos - self.dir * (44 + i * 8), by + dy - 4 + random.uniform(-4, 4),
+                               -self.dir * (25 + random.uniform(0, 20)), random.uniform(-12, 12), 0.7,
+                               col=random.choice(MAGIC))
+                if abs(speed) > 0.6:               # speed lines behind the broom
+                    self.spawn("spark", cx + self.pos - self.dir * 52, by + dy - 10 + random.uniform(-6, 6),
+                               -self.dir * 70, 0, 0.3)
+                self.emit = 0.045
         elif act == "bat":                       # vampire: turns into a bat
             self.batform = 0.12 < p < 0.88
             if self.batform != self._was_bat:    # puff of smoke on transform
@@ -1980,11 +2085,13 @@ class Widget:
             if self.batform:
                 self.pos = math.sin(t * 1.6) * 10
                 dy = -8 - math.sin(t * 5) * 4
-        elif act == "float":                     # ghost: floating loop
+        elif act == "float":                     # ghost: floating loop, the sheet ripples
             ang = p * 2 * math.pi
             self.pos = math.sin(ang) * 12
             dy = -7 - math.sin(ang * 2) * 6
             arm_l = arm_r = -4 + math.sin(t * 6) * 2
+            rot = math.sin(ang) * 0.08
+            self.part_fx["body"] = (math.sin(t * 5) * 0.5, math.sin(t * 4) * 0.8, math.sin(t * 3.3) * 0.035)
             eye = "happy"
         elif act == "zombie":                    # Frankenstein: stiff stomp, arms out front
             self.pos += self.dir * 14 * dt
@@ -2262,7 +2369,8 @@ class Widget:
 
         bx = cx + self.pos
         k = max(0.3, 1 + dy / 60)
-        self.oval(bx, by + 3, SW / 2 * k, 3.5, hx((0, 0, 0), 0.35 * k))
+        if not self.pet:                        # no card to cast a shadow on
+            self.oval(bx, by + 3, SW / 2 * k, 3.5, hx((0, 0, 0), 0.35 * k))
 
         xf = Xform(bx, by + dy - SH / 2 * sy, sx, sy, rot)   # anchored at the feet
         if self.batform:
@@ -2416,8 +2524,14 @@ class Widget:
         transform, so they jump, spin and squash with it. `c` is kept for callers."""
         ch = ch or self.character_now()
         for path in character.layers(ch, layer):
+            slot = os.path.basename(os.path.dirname(path))
+            fx = self.part_fx.get(slot) if ch is self.character_now() else None
+            pxf = xf
+            if fx:                                   # e.g. a hat trailing in the wind
+                tx, ty = xf.pt(fx[0], fx[1])
+                pxf = Xform(tx, ty, xf.sx, xf.sy, xf.rot + fx[2])
             for x, y, w, h, col in self.skins.runs(path) or []:
-                self.px_rect(xf, x, y, col, w, h)
+                self.px_rect(pxf, x, y, col, w, h)
 
     def draw_props(self, props, bx, by, bt, t, arm_r):
         """Floating props are pulled towards Clawdy so the whole animation fits in
@@ -2683,6 +2797,21 @@ class Widget:
         key = (tuple((n, round(p), r) for n, p, r in rows), self.work, near, self.near_pin, st.error, self.setup_phase,
                time.time() < self.alarm_until, time.time() < self.note_until and self.note_text,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
+        if self.pet:                        # free-roaming pet: just Clawdy, the desktop shows through
+            self.canvas.delete("all")
+            mark = self.canvas.create_line(0, 0, 0, 0)
+            top = max((p for _, p, _ in rows), default=0)
+            PET_K = 0.95
+            self.draw_scene(top, PET_K, CW / 2, H - 8 - 27 * PET_K)
+            if time.time() < self.alarm_until or time.time() < self.note_until:
+                text = self.alarm_text if time.time() < self.alarm_until else self.note_text
+                col = (0.95, 0.40, 0.35) if time.time() < self.alarm_until else self.note_color
+                self.text(CW / 2, 8, text, hx(col), 6, bold=True, anchor="center")
+            self.layer(mark, "dyn")
+            self.pet_shape()
+            if self.panel_out or self.e > 0:
+                self.draw_panel_window(rows, key)
+            return
         if key != self._skey:               # rebuild the static layer only when something changed
             self._skey = key
             self.canvas.delete("bg")

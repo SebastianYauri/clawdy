@@ -5,6 +5,16 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.4
 
+- **Pet mode.** **Settings… → Pet mode**: no card, no rings; Clawdy stands on
+  the bottom edge of the screen (above the taskbar or Dock), wanders left and
+  right while it walks, keeps acting out what Claude or Codex is doing, and
+  the usage panel slides out when you hover it. Click it for the chats tree as
+  usual; drag it along the edge.
+- **Livelier animations.** The witch's flight is a figure-eight swoop: she
+  leans into the turns, dives, her hat trails in the wind and the broom leaves
+  a trail of sparkles and speed lines, inside the rings and on desktop walks.
+  The ghost's sheet ripples while it floats. Parts can now wobble on their own
+  (hats, capes, sheets), which later animations will use.
 - **Clawdy as a Codex Pet.** `codex-pet/` holds Clawdy (and each costume) in
   the Codex Pets format, rendered from Clawdy's own animations. **Settings… →
   Install as a Codex pet** copies it into `~/.codex/pets`; then `/pet` in Codex.

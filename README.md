@@ -97,6 +97,10 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
   climbs back up a rope; on Linux and macOS it hangs from the top of the screen,
   swings along and slides back down a rope. Click it to get a wave. You can turn
   walks off from the right-click menu.
+- **Pet mode.** Prefer a desktop pet? Turn on **Settings… → Pet mode**: the card
+  and rings go away, Clawdy stands on the bottom edge of your screen and
+  wanders along it while it walks, still acting out what Claude or Codex is
+  doing. Hover it and the usage panel slides out.
 - **One click to a new chat.** The **+** button opens a new chat in the Claude
   desktop app, or on claude.ai if the app isn't installed.
 - **Updates itself.** Checks GitHub Releases at start-up and every 6 hours.
