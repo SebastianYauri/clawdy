@@ -10,7 +10,8 @@ import clawdy_character as character
 from clawdy_i18n import t as tr
 
 MW, PAD = 400, 12
-TILE, GAP = 34, 37
+TILE, GAP = 44, 47
+PER_ROW = (MW - 2 * PAD + (GAP - TILE)) // GAP
 PREVIEW_H = 104
 
 
@@ -54,14 +55,18 @@ class Creator:
         y += 36
         for slot in character.SLOTS:
             out.append((slot, tr("creator." + slot), y))
-            y += 18 + TILE + 10
+            y += 18 + self.tile_rows(len(character.PARTS[slot]) + 1) * GAP + 7
         if character.user_skins():
             out.append(("skin", tr("creator.mine"), y))
-            y += 18 + TILE + 10
+            y += 18 + self.tile_rows(len(character.user_skins()) + 1) * GAP + 7
         out.append(("presets", tr("creator.presets"), y))
         y += 18 + 3 * 24 + 8
         out.append(("buttons", "", y))
         return out
+
+    @staticmethod
+    def tile_rows(n):
+        return (n + PER_ROW - 1) // PER_ROW
 
     def layout_height(self):
         return self.rows()[-1][2] + 26 + PAD
@@ -123,35 +128,23 @@ class Creator:
             else:
                 options = [None] + (character.PARTS[kind] if kind != "skin" else [n for n, _ in character.user_skins()])
                 for i, opt in enumerate(options):
-                    x1, y1 = PAD + i * GAP, y + 16
+                    x1, y1 = PAD + (i % PER_ROW) * GAP, y + 16 + (i // PER_ROW) * GAP
                     on = (ch.get(kind) == opt) if kind != "skin" else (ch.get("skin") == opt)
                     hot = self.hover == (kind, opt)
                     fill = (0.30, 0.22, 0.19) if on else ((0.22, 0.20, 0.19) if hot else (0.17, 0.155, 0.145))
                     self.round_rect(c, S(x1), S(y1), S(x1 + TILE), S(y1 + TILE), S(6), fill=hx(fill),
                                     outline=hx(self.ORANGE) if on else "")
-                    if opt is None:
-                        c.create_line(S(x1 + 9), S(y1 + TILE / 2), S(x1 + TILE - 9), S(y1 + TILE / 2),
-                                      fill=hx(self.DIM), width=S(1.5))
-                    else:
-                        self.tile(kind, opt, x1, y1)
+                    self.tile(kind, opt, x1, y1)
                     self.hits.append(((x1, y1, x1 + TILE, y1 + TILE), lambda kind=kind, opt=opt: self.set(kind, opt)))
                     self.hits[-1] = (self.hits[-1][0], self.hits[-1][1], (kind, opt))
 
     def tile(self, slot, name, x1, y1):
-        """A part by itself, small, over a faint body."""
-        c, k, w = self.canvas, self.k, self.w
-        s = 0.34 * k
-        cx, cy = (x1 + TILE / 2) * k, (y1 + TILE / 2 + 8) * k
-        body = self.hx(character.color_rgb(w.character_now()), 0.25)
-        c.create_rectangle(cx - 21 * s, cy - 27 * s, cx + 21 * s, cy + 15 * s, fill=body, outline="")
-        if slot == "skin":
-            paths = character.layers({"skin": name}, "front")
-        else:
-            paths = character.layers({slot: name}, "back") + character.layers({slot: name}, "front")
-        for path in paths:
-            for x, y, ww, hh, col in w.skins.runs(path) or []:
-                c.create_rectangle(round(cx + x * s), round(cy + y * s), round(cx + (x + ww) * s),
-                                   round(cy + (y + hh) * s), fill=col, outline="")
+        """Clawdy wearing just this part (or nothing), small."""
+        k, w = self.k, self.w
+        s = 0.46 * k
+        cx, cy = (x1 + TILE / 2) * k, (y1 + TILE / 2 + 9) * k
+        ch = {"color": w.character_now()["color"], slot: name}
+        w.draw_still(self.canvas, cx, cy, s, ch, "open")
 
     def pill(self, x, y, w_, h, text, on, fn):
         c, k = self.canvas, self.k
