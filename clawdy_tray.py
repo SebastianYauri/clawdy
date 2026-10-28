@@ -28,6 +28,11 @@ class Tray:
         except Exception:
             return
         self.pystray = pystray
+        try:                                # GTK (behind the Linux tray) switches the C locale to the
+            import locale                   # system one; Tk then rejects decimals like "1.95". Undo it.
+            locale.setlocale(locale.LC_NUMERIC, "C")
+        except Exception:
+            pass
         try:
             image = Image.open(icon_path)
             self.icon = pystray.Icon("clawdy", image, "Clawdy", menu=self.menu())

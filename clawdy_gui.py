@@ -3410,18 +3410,22 @@ def run(demo=False, selftest=0):
         if msg.startswith(b"quit"):
             root.destroy()
             return
-        if msg.startswith(b"creator") and app["widget"]:      # `clawdy --skin`: open the creator
-            app["widget"].open_creator()
-        if msg.startswith(b"walk") and app["widget"]:
-            app["widget"].maybe_walk(force=True)
-            if not app["widget"].walk:
-                app["widget"].flash(tr("walk.busy"), 4)
-        if msg.startswith(b"show"):
+        try:                                   # a failing action must never stop the listening
+            if msg.startswith(b"creator") and app["widget"]:      # `clawdy --skin`: open the creator
+                app["widget"].open_creator()
+            if msg.startswith(b"walk") and app["widget"]:
+                app["widget"].maybe_walk(force=True)
+                if not app["widget"].walk:
+                    app["widget"].flash(tr("walk.busy"), 4)
+            if msg.startswith(b"show"):
+                if app["widget"]:
+                    app["widget"].greet()
+                elif app["welcome"]:
+                    app["welcome"].win.lift()
+                    app["welcome"].win.focus_force()
+        except Exception as e:
             if app["widget"]:
-                app["widget"].greet()
-            elif app["welcome"]:
-                app["welcome"].win.lift()
-                app["welcome"].win.focus_force()
+                app["widget"].log("lock message", msg, e)
         root.after(200, poll_lock)
 
     if lock:
