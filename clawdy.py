@@ -8,6 +8,8 @@
     clawdy.py --quit        close the running copy
     clawdy.py --demo        cycle through every animation with made-up data
     clawdy.py --walk        send the running Clawdy for a walk right now
+    clawdy.py --hook-agy    called by the Antigravity CLI on every event
+    clawdy.py --statusline-agy   the Antigravity CLI's status line (its quota comes this way)
 """
 import os
 import sys
@@ -17,14 +19,40 @@ if sys.platform.startswith("linux"):
     os.environ.setdefault("GDK_BACKEND", "x11")   # GTK (tray, pet window) alongside Tk, placeable
 
 
+def read_stdin(timeout):
+    """All of stdin, or whatever arrived within `timeout` seconds (never hang agy's bar)."""
+    if sys.platform == "win32":
+        return sys.stdin.read()
+    import select
+    import time
+    chunks, end = [], time.time() + timeout
+    while True:
+        ready, _, _ = select.select([sys.stdin], [], [], max(0.0, end - time.time()))
+        if not ready:
+            break
+        chunk = os.read(sys.stdin.fileno(), 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
 def main(argv):
     if "--hook" in argv:                 # hot path: fast and windowless
         import clawdy_hook
         clawdy_hook.main()
         return 0
-    if "--agy-mcp" in argv:              # registered in agy as an MCP server: reads its quota
-        import clawdy_agy_mcp
-        return clawdy_agy_mcp.main()
+    if "--statusline-agy" in argv:       # Antigravity CLI status line: its state (quota included) on stdin
+        line = ""
+        try:
+            import json
+            import clawdy_agy
+            raw = read_stdin(1.5)
+            line = clawdy_agy.statusline(json.loads(raw) if raw.strip() else {})
+        except Exception:
+            pass
+        sys.stdout.write((line or "Clawdy") + "\n")
+        return 0
     if "--hook-agy" in argv:             # Antigravity CLI: the event name comes as an argument
         try:
             import json

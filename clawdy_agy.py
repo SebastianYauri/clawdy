@@ -2,9 +2,12 @@
 
 Activity comes from its hooks (~/.gemini/config/hooks.json): every event runs
 `clawdy --hook-agy <Event>` with a JSON on stdin, which is turned into the same
-per-session state files the Claude Code hook writes. The CLI doesn't share its
-quota with other programs, so usage is only known when it ran out: the CLI log
-records "quota reached … Resets in …", which becomes a full bar until then.
+per-session state files the Claude Code hook writes. Quota comes from its status
+line (~/.gemini/antigravity-cli/settings.json): after every turn agy runs
+`clawdy --statusline-agy` with its whole state as JSON on stdin, quota buckets
+included, and shows the line it prints in its own bar. Fallbacks: the desktop
+app's language server while it runs, and the CLI log's "quota reached … Resets
+in …", which becomes a full bar until then.
 """
 import glob
 import json
@@ -42,8 +45,8 @@ def installed():
 
 # ---------------------------------------------------------------- hooks
 
-def _command():
-    return cs.hook_command_prefix() + " --hook-agy"
+def _command(flag="--hook-agy"):
+    return cs.hook_command_prefix() + " " + flag
 
 
 def _read():
@@ -79,7 +82,109 @@ def set_hooks(on):
             cs.write_json(HOOKS, data)
     except OSError as e:
         return str(e)
+    set_statusline(on)                       # the quota comes this way; a foreign status line is left alone
     return None
+
+
+# ---------------------------------------------------------------- status line
+
+SETTINGS = os.path.join(CLI_DIR, "settings.json")
+STATUS_FLAG = "--statusline-agy"
+BUCKETS = {"gemini-5h": ("session", "Gemini"), "gemini-weekly": ("weekly_all", "Gemini"),
+           "3p-5h": ("session", "Claude/GPT"), "3p-weekly": ("weekly_all", "Claude/GPT")}
+
+
+def _settings():
+    try:
+        return json.load(open(SETTINGS, encoding="utf-8-sig"))
+    except Exception:
+        return {}
+
+
+def _statusline_ours(sl):
+    return isinstance(sl, dict) and STATUS_FLAG in str(sl.get("command", ""))
+
+
+def statusline_installed():
+    return _statusline_ours(_settings().get("statusLine"))
+
+
+def set_statusline(on):
+    """agy runs the status line command after every turn (through a shell, with its whole
+    state as JSON on stdin: quota included). Clawdy's prints a short line for agy's bar
+    and keeps the numbers. A status line someone else set up is left alone."""
+    data = _settings()
+    if not isinstance(data, dict):
+        data = {}
+    sl = data.get("statusLine")
+    if on:
+        if _statusline_ours(sl):
+            return None
+        if isinstance(sl, dict) and sl.get("command"):
+            return "statusline taken"
+        data["statusLine"] = {"type": "command", "enabled": True,
+                              "command": _command(STATUS_FLAG) + ("" if cs.WIN else " || true")}
+    elif _statusline_ours(sl):
+        data.pop("statusLine")
+    else:
+        return None
+    try:
+        cs.write_json(SETTINGS, data)
+    except OSError as e:
+        return str(e)
+    return None
+
+
+def parse_statusline(payload):
+    """Rows like parse_summary's, from the `quota` of the status line payload: buckets by id,
+    each with remaining_fraction, reset_time or reset_in_seconds, maybe disabled."""
+    quota = payload.get("quota") if isinstance(payload, dict) else None
+    out, now = [], time.time()
+    for bid, bucket in (quota or {}).items() if isinstance(quota, dict) else []:
+        if not isinstance(bucket, dict) or bucket.get("disabled") is True:
+            continue
+        name = str(bid).lower()
+        kind, scope = BUCKETS.get(name) or (
+            "weekly_all" if "week" in name else "session" if "5h" in name else None, str(bid))
+        frac = _fraction(bucket.get("remaining_fraction"))
+        if kind is None or frac is None:
+            continue
+        reset = _reset(bucket.get("reset_time"))
+        secs = bucket.get("reset_in_seconds")
+        if reset is None and isinstance(secs, (int, float)) and secs > 0:
+            reset = _reset(round((now + float(secs)) / 60) * 60)   # to the minute: steady across turns
+        out.append((kind, scope, round((1 - frac) * 100, 1), reset))
+    return out
+
+
+def statusline(payload):
+    """One turn of agy: keep its quota (written only when it changed) and return the line for its bar."""
+    rows = parse_statusline(payload)
+    if rows:
+        try:
+            old = json.load(open(QUOTA_FILE))
+            same = [tuple(r) for r in old.get("rows", [])] == rows and time.time() - old.get("updated", 0) < 600
+        except Exception:
+            same = False
+        if not same:
+            cs.write_json(QUOTA_FILE, {"updated": time.time(), "rows": rows})
+    return statusline_text(payload, rows)
+
+
+def statusline_text(payload, rows):
+    model = payload.get("model") if isinstance(payload.get("model"), dict) else {}
+    label = str(model.get("display_name") or model.get("id") or "").split(" (")[0].strip()
+    group = "Gemini" if "gemini" in label.lower() or not label else "Claude/GPT"
+    mine = [r for r in rows if r[1] == group] or rows
+    parts = [label] if label else []
+    for kind, _, pct, _ in sorted(mine, key=lambda r: r[0] != "session"):
+        parts.append("%s %d%%" % ("5h" if kind == "session" else "7d", round(pct)))
+    ctx = payload.get("context_window") if isinstance(payload.get("context_window"), dict) else {}
+    try:
+        parts.append("ctx %d%%" % round(float(ctx.get("used_percentage"))))
+    except (TypeError, ValueError):
+        pass
+    return " \u00b7 ".join(parts) or "Clawdy"
 
 
 def state_for(ev, tool):
@@ -106,33 +211,6 @@ def state_for(ev, tool):
 QUOTA_FILE = os.path.join(cs.cache_dir(), "agy-quota.json")
 SERVICE = "/exa.language_server_pb.LanguageServerService"
 METADATA = {"metadata": {"ideName": "antigravity", "extensionName": "antigravity", "ideVersion": "unknown", "locale": "en"}}
-
-
-def endpoints_from_env():
-    """[(scheme, host, port, token)] to try, from what agy hands its child processes: the
-    sidecar web port speaks plain HTTP, the language server address is usually the TLS one."""
-    token = os.environ.get("ANTIGRAVITY_CSRF_TOKEN")
-    if not token:
-        return []
-    out = []
-    port = os.environ.get("ANTIGRAVITY_SIDECAR_WEB_PORT") or ""
-    if port.isdigit():
-        out.append(("http", "127.0.0.1", int(port), token))
-    addr = os.environ.get("ANTIGRAVITY_LS_ADDRESS") or ""
-    scheme = None
-    if "://" in addr:
-        scheme, addr = addr.split("://", 1)
-    host, _, aport = addr.rpartition(":")
-    if aport.isdigit():
-        host = host or "127.0.0.1"
-        for sc in ([scheme] if scheme else ["https", "http"]):
-            out.append((sc, host, int(aport), token))
-    return out
-
-
-def endpoint_from_env():
-    eps = endpoints_from_env()
-    return eps[0] if eps else None
 
 
 def endpoints_from_processes():
@@ -215,31 +293,8 @@ def refresh_quota(endpoint):
     return rows
 
 
-STATUS_FILE = os.path.join(cs.cache_dir(), "agy-mcp-status.json")
-
-
-def ask_server_quota():
-    """From a hook: works only if agy ever hands hooks its token (it doesn't today)."""
-    endpoint = endpoint_from_env()
-    if not endpoint:
-        return
-    try:
-        if os.path.getmtime(QUOTA_FILE) > time.time() - 60:
-            return
-    except OSError:
-        pass
-    try:
-        refresh_quota(endpoint)
-    except Exception:
-        pass
-
-
 def handle(ev, data):
     """Called by the hook: one Antigravity event → the session's state file."""
-    try:
-        ask_server_quota()
-    except Exception:
-        pass
     sid = "agy-" + "".join(c for c in str(data.get("conversationId") or "x") if c.isalnum() or c in "-_")[:72]
     os.makedirs(cs.SESSIONS, exist_ok=True)
     path = os.path.join(cs.SESSIONS, sid + ".json")
@@ -278,8 +333,8 @@ def _logs():
 
 
 def usage():
-    """Numbers saved by Clawdy's MCP server while agy runs (fresh within a day), else the
-    desktop app's language server, else a full bar while the CLI log says the quota is out."""
+    """Numbers the CLI handed its status line (fresh within a day), else the desktop app's
+    language server, else a full bar while the CLI log says the quota is out."""
     rows, updated = None, 0
     try:
         q = json.load(open(QUOTA_FILE))
@@ -373,31 +428,6 @@ def resume(session):
 
 def new_chat_in(cwd):
     return cs.open_terminal(_in(cwd))
-
-
-MCP_CONFIG = os.path.join(HOME, "config", "mcp_config.json")
-
-
-def mcp_registered():
-    try:
-        return "clawdy" in json.load(open(MCP_CONFIG, encoding="utf-8-sig")).get("mcpServers", {}) or \
-               '"clawdy"' in open(MCP_CONFIG, encoding="utf-8-sig").read()
-    except Exception:
-        return False
-
-
-def register_mcp():
-    """`agy mcp add clawdy <clawdy> --agy-mcp`, so agy launches Clawdy's quota reader. Returns an error or None."""
-    cli = cli_path()
-    if not cli:
-        return "agy not found"
-    import subprocess
-    prog = [sys.executable] if cs.FROZEN else [sys.executable, cs.MAIN]
-    try:
-        r = subprocess.run([cli, "mcp", "add", "clawdy"] + prog + ["--agy-mcp"], capture_output=True, text=True, timeout=30)
-    except Exception as e:
-        return str(e)[:80]
-    return None if r.returncode == 0 else (r.stderr or r.stdout).strip()[:120]
 
 
 def open_new_chat():

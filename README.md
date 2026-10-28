@@ -121,12 +121,14 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
 - **Gemini too, via Antigravity CLI.** Google replaced Gemini CLI with the
   Antigravity CLI (`agy`); Clawdy hooks into it (`~/.gemini/config/hooks.json`,
   installed with *React to Claude Code*) and acts out what it does, counts its
-  sessions in the crew and notifies when a task is done. The quota: the
-  Antigravity **desktop app** is read directly (its language server, per model
-  pool and window, like other quota trackers do); the **CLI** keeps its quota
-  to itself (its token never reaches hooks or MCP servers), so with the CLI
-  alone the rings only fill when its log reports the quota exhausted, with the
-  reset time. **+** opens `agy` and the chats tree resumes its conversations.
+  sessions in the crew and notifies when a task is done. The quota comes
+  through agy's **status line**: Clawdy registers a one-line status command
+  (`~/.gemini/antigravity-cli/settings.json`, shows model, 5h/7d quota and
+  context in agy's own bar) and keeps the numbers agy passes it: Gemini and
+  Claude/GPT pools, 5-hour and weekly windows. It refreshes with every turn
+  you take in agy. The Antigravity **desktop app** is read directly when it
+  runs (its language server). **+** opens `agy` and the chats tree resumes
+  its conversations.
 - **Free and private.** No API key, no extra cost, no servers, no telemetry.
 - **English and Spanish**, following your system language.
 

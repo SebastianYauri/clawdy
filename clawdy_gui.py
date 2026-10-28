@@ -665,9 +665,9 @@ class Widget:
             p.bind("<Control-Button-1>", self.popup)
 
         self.v_hooks = tk.BooleanVar(value=cs.hooks_installed())
-        if self.v_hooks.get() and agy.installed() and not agy.hooks_installed():
+        if self.v_hooks.get() and agy.installed() and not (agy.hooks_installed() and agy.statusline_installed()):
             try:
-                agy.set_hooks(True)
+                agy.set_hooks(True)          # hooks + status line (the quota comes through the latter)
             except Exception:
                 pass
         self.v_start = tk.BooleanVar(value=cs.autostart_enabled())
@@ -1426,11 +1426,6 @@ class Widget:
         except Exception as e:
             self.log("design", e)
             self.flash(tr("share.failed"), 4)
-
-    def connect_agy_quota(self):
-        """Register Clawdy in agy as the MCP server that reads its quota."""
-        err = agy.register_mcp()
-        self.flash(tr("agy.connected") if not err else err, 8)
 
     def install_codex_pet(self):
         """Copy the bundled Clawdy pet into Codex's pets folder (Codex app and CLI load it with /pet)."""
