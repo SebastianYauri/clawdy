@@ -9,7 +9,9 @@ All notable changes to Clawdy are listed here. Versions follow
   the bottom edge of the screen (above the taskbar or Dock), wanders left and
   right while it walks, keeps acting out what Claude or Codex is doing, and
   the usage panel slides out when you hover it. Click it for the chats tree as
-  usual; drag it along the edge.
+  usual; drag it along the edge. Hover it and five little buttons appear above
+  its head: park it at the left or right edge, let it roam or stay put, and
+  make it smaller or bigger.
 - **Livelier animations.** The witch's flight is a figure-eight swoop: she
   leans into the turns, dives, her hat trails in the wind and the broom leaves
   a trail of sparkles and speed lines, inside the rings and on desktop walks.
