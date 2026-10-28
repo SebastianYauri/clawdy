@@ -92,9 +92,12 @@ DIM = (0.62, 0.59, 0.55)
 KEY = "#ff00ff"      # color Windows makes transparent
 
 
+NO_BLEND = False      # pet mode: there is no card behind, so faded colors would turn into dark specks
+
+
 def hx(rgb, a=1.0):
     """Tk color. The background is opaque, so alpha is blended against the card."""
-    if a < 1.0:
+    if a < 1.0 and not NO_BLEND:
         rgb = tuple(c * a + b * (1 - a) for c, b in zip(rgb, CARD))
     return "#%02x%02x%02x" % tuple(max(0, min(255, round(c * 255))) for c in rgb)
 
@@ -641,6 +644,7 @@ class Widget:
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.held = False                    # being carried around with the mouse
         self.pet = bool(cs.load_config().get("pet", False))   # pet mode: no card, Clawdy roams the bottom edge
+        globals()["NO_BLEND"] = self.pet
         self.v_pet = tk.BooleanVar(value=self.pet)
         self.pet_shaper, self.cur_act, self._pet_mon = None, None, None
         self.part_fx = {}                    # per-slot (dx, dy, rot) wobble for the current frame
@@ -781,6 +785,7 @@ class Widget:
     def toggle_pet(self):
         """Switch between the card and a free-roaming pet."""
         self.pet = self.v_pet.get()
+        globals()["NO_BLEND"] = self.pet
         cs.update_config(pet=self.pet)
         k = self.k
         cw, h = round(CW * k), round(H * k)
@@ -2740,6 +2745,8 @@ class Widget:
             if q["k"] in ("spark", "drop", "conf", "fw"):
                 q["vy"] += 120 * dt
             a = q["life"] / q["max"]
+            if self.pet and a < 0.4:          # no card behind: a faded particle would be a dark speck
+                continue
             x, y, k = q["x"], q["y"], q["k"]
             ccx, ccy = getattr(self, "_center", (x, y))   # closer to Clawdy, to fit the porthole
             x, y = ccx + (x - ccx) * PART_REACH, ccy + (y - ccy) * PART_REACH
