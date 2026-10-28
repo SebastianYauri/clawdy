@@ -827,14 +827,14 @@ class Widget:
         self.pet_tools = []
         if a < 0.05:
             return
-        y = max(12, top_y - 14)
+        y = max(9, top_y - 15)
         keys = (("left", "◀"), ("roam", "↔"), ("smaller", "−"), ("bigger", "+"), ("right", "▶"))
         for i, (key, glyph) in enumerate(keys):
             x = CW / 2 + (i - 2) * 20
             near = self.mouse is not None and math.hypot(self.mouse[0] - x, self.mouse[1] - y) < 10
             on = key == "roam" and self.pet_roaming
             fill = ORANGE if (near or on) else (0.20, 0.18, 0.17)
-            self.oval(x, y, 8.5, 8.5, hx(fill, a))
+            self.oval(x, y, 7.5, 7.5, hx(fill, a))
             self.text(x, y + 0.5, glyph, hx((0.12, 0.09, 0.08) if (near or on) else TXT, a), 7, bold=True, anchor="center")
             self.pet_tools.append((key, x, y))
 
