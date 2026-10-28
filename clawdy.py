@@ -22,6 +22,17 @@ def main(argv):
         import clawdy_hook
         clawdy_hook.main()
         return 0
+    if "--hook-agy" in argv:             # Antigravity CLI: the event name comes as an argument
+        try:
+            import json
+            import clawdy_agy
+            i = argv.index("--hook-agy")
+            ev = argv[i + 1] if i + 1 < len(argv) else ""
+            raw = sys.stdin.read() if sys.stdin else ""
+            clawdy_agy.handle(ev, json.loads(raw) if raw.strip() else {})
+        except Exception:
+            pass
+        return 0
 
     import clawdy_system
     if "--quit" in argv:                 # used by the installers when updating

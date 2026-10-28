@@ -32,6 +32,13 @@ All notable changes to Clawdy are listed here. Versions follow
   pixel-art sprites (`assets/parts/fx`) drawn on the same 32×32 grid as the
   costume parts, so they can be edited in Pixelorama too. **Settings… →
   Install as a Codex pet** copies it into `~/.codex/pets`; then `/pet` in Codex.
+- **Antigravity (Gemini) support.** Google's Antigravity CLI, the successor of
+  Gemini CLI, is a third source: Clawdy installs its hooks alongside Claude
+  Code's, reacts to its tools and model calls, counts its sessions in the crew,
+  notifies "Gemini finished", lists and resumes its conversations and opens
+  `agy` from **+**. Its quota isn't exposed to other programs, so the rings
+  show it only when the CLI log reports it exhausted. Pick it in **Usage from**
+  or on first run.
 - **Codex support.** Clawdy now works with OpenAI's Codex CLI: it reads your
   ChatGPT plan's 5-hour and weekly limits and what Codex is doing from the
   session files Codex writes (`~/.codex/sessions`), with no setup, network or

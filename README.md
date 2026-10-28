@@ -11,7 +11,8 @@
 
 **Clawdy** is a tiny desktop buddy that sits in a corner of your screen and
 shows **how much of your Claude plan you've used** (or your ChatGPT plan's
-Codex limits, if you use the Codex CLI). While Claude Code works,
+Codex limits, if you use the Codex CLI; it also reacts to Google's Antigravity
+CLI, the successor of Gemini CLI). While Claude Code works,
 Clawdy acts it out: it thinks, types on its laptop, hammers away at commands,
 juggles subagents… and throws confetti when the job is done.
 
@@ -117,6 +118,13 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
 - **A Codex pet too.** Clawdy ships as a [Codex Pet](codex-pet/): **Settings… →
   Install as a Codex pet** and it shows up inside the Codex app and CLI with
   `/pet`, with every costume available as a separate pet.
+- **Gemini too, via Antigravity CLI.** Google replaced Gemini CLI with the
+  Antigravity CLI (`agy`); Clawdy hooks into it (`~/.gemini/config/hooks.json`,
+  installed with *React to Claude Code*) and acts out what it does, counts its
+  sessions in the crew and notifies when a task is done. Antigravity doesn't
+  share its quota with other programs, so the rings only fill when its log
+  says the quota ran out (with the reset time); **+** opens `agy` and the chats
+  tree resumes its conversations.
 - **Free and private.** No API key, no extra cost, no servers, no telemetry.
 - **English and Spanish**, following your system language.
 

@@ -21,6 +21,7 @@ from clawdy_tray import Tray
 from clawdy_walk import Walk
 import clawdy_sessions as sessions
 import clawdy_codex as codex
+import clawdy_agy as agy
 import clawdy_share
 import clawdy_skins
 import clawdy_character as character
@@ -292,11 +293,31 @@ class State:
 
 
 def source():
-    """Where usage comes from: "claude" or "codex" (OpenAI Codex CLI)."""
+    """Where usage comes from: "claude", "codex" (OpenAI Codex CLI) or "agy" (Google Antigravity CLI)."""
     pref = cs.load_config().get("source", "auto")
-    if pref in ("claude", "codex"):
+    if pref in ("claude", "codex", "agy"):
         return pref
-    return "codex" if codex.installed() and not cs.logged_in() else "claude"
+    if cs.logged_in():
+        return "claude"
+    if codex.installed():
+        return "codex"
+    return "agy" if agy.installed() else "claude"
+
+
+def source_name(src=None):
+    return {"codex": "Codex", "agy": "Gemini"}.get(src or source(), "Claude")
+
+
+def fetch_agy(st):
+    """Antigravity doesn't share its quota: only an exhausted one shows (from its log)."""
+    st.need, st.retry_at = None, 0
+    if not agy.installed():
+        st.need, st.error = "agy", tr("need.agy")
+        return "auth"
+    data = agy.usage() or {"limits": [], "source": "agy", "note": "error.agy_none"}
+    st.data, st.error, st.updated = data, None, time.time()
+    st.save()
+    return "ok"
 
 
 def fetch_codex(st):
@@ -318,8 +339,10 @@ def fetch(st):
     """One usage request. Returns "ok", "expired", "rate", "auth", "offline", "error" or "skip"."""
     if source() == "codex":
         return fetch_codex(st)
-    if (st.data or {}).get("source") == "codex":
-        st.data, st.updated = None, 0.0         # cached Codex numbers: not Claude's
+    if source() == "agy":
+        return fetch_agy(st)
+    if (st.data or {}).get("source") in ("codex", "agy"):
+        st.data, st.updated = None, 0.0         # cached numbers of another source: not Claude's
     if time.time() < st.retry_at or st.fresh():
         return "skip"
     try:
@@ -639,6 +662,11 @@ class Widget:
             p.bind("<Control-Button-1>", self.popup)
 
         self.v_hooks = tk.BooleanVar(value=cs.hooks_installed())
+        if self.v_hooks.get() and agy.installed() and not agy.hooks_installed():
+            try:
+                agy.set_hooks(True)
+            except Exception:
+                pass
         self.v_start = tk.BooleanVar(value=cs.autostart_enabled())
         self.v_pin = tk.BooleanVar(value=self.pinned)
         self.popup_menu = None
@@ -1115,9 +1143,9 @@ class Widget:
             return
         if ev.y / self.k > INFO_Y - 9 and self.no_usage() and not self.setup_phase:
             self._drag = False
-            if self.st.need == "codex":
+            if self.st.need in ("codex", "agy"):
                 import webbrowser
-                webbrowser.open(cs.CODEX_WEB)
+                webbrowser.open(cs.CODEX_WEB if self.st.need == "codex" else agy.WEB)
             else:
                 self.setup_claude_code()
             return
@@ -1190,6 +1218,8 @@ class Widget:
         """Which "new chat" label applies: Codex, the Claude app or claude.ai."""
         if source() == "codex":
             return kind + ".chat_codex" if kind == "menu" else "chat.codex"
+        if source() == "agy":
+            return kind + ".chat_agy" if kind == "menu" else "chat.agy"
         if kind == "menu":
             return "menu.chat_app" if self.has_app else "menu.chat_web"
         return "chat.app" if self.has_app else "chat.web"
@@ -1198,6 +1228,8 @@ class Widget:
         self.plus_click = time.time()
         if source() == "codex":
             cs.open_new_codex_chat()
+        elif source() == "agy":
+            agy.open_new_chat()
         else:
             cs.open_new_chat(self.has_app)
         self.force, self.act_t = "wave", 0.0                 # Clawdy waves
@@ -1230,14 +1262,18 @@ class Widget:
         if self.popup_menu:
             self.popup_menu.close()
         now = time.time()
-        codex_mode = source() == "codex"
+        src = source()
+        codex_mode, agy_mode = src == "codex", src == "agy"
         if codex_mode:
             opened = [dict(s, id=s["sid"], project=os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else "Codex",
                            pid=None) for s in codex.sessions(now).values() if s.get("sid")]
             opened.sort(key=lambda s: -s["ts"])
             recent = codex.recent(exclude={s["id"] for s in opened}, limit=5)
+        elif agy_mode:
+            opened = [dict(s, id=s["id"][4:]) for s in sessions.open_sessions(now) if s["id"].startswith("agy-")]
+            recent = agy.recent(exclude={s["id"] for s in opened}, limit=5)
         else:
-            opened = sessions.open_sessions(now)
+            opened = [s for s in sessions.open_sessions(now) if not s["id"].startswith("agy-")]
             recent = sessions.recent_sessions(exclude={s["id"] for s in opened}, limit=5)
         projects = sessions.recent_projects(recent, opened)
 
@@ -1258,11 +1294,14 @@ class Widget:
             if codex_mode:                   # no window to raise: reopen the thread in a terminal
                 sessions.resume_codex(s)
             elif not cs.focus_session(s["pid"]):
-                self.flash(tr("sessions.cant_focus"), 4)
+                if agy_mode:
+                    agy.resume(s)
+                else:
+                    self.flash(tr("sessions.cant_focus"), 4)
 
-        resume = sessions.resume_codex if codex_mode else sessions.resume
-        new_in = sessions.new_codex_in if codex_mode else sessions.new_chat_in
-        items = [("title", "Codex" if codex_mode else tr("sessions.title"), "")]
+        resume = sessions.resume_codex if codex_mode else (agy.resume if agy_mode else sessions.resume)
+        new_in = sessions.new_codex_in if codex_mode else (agy.new_chat_in if agy_mode else sessions.new_chat_in)
+        items = [("title", "Codex" if codex_mode else ("Antigravity" if agy_mode else tr("sessions.title")), "")]
         if opened:
             items.append(("section", tr("sessions.open")))
             for s in opened[:5]:
@@ -1362,8 +1401,8 @@ class Widget:
             ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
             ("toggle", tr("menu.sounds"), w.v_sounds, w.toggle_sounds),
             ("sep",),
-            ("pills", tr("menu.source"), [("auto", tr("costume.auto")), ("claude", "Claude"), ("codex", "Codex")],
-             lambda: cs.load_config().get("source", "auto"), w.set_source, 3),
+            ("pills", tr("menu.source"), [("auto", tr("costume.auto")), ("claude", "Claude"), ("codex", "Codex"), ("agy", "Gemini")],
+             lambda: cs.load_config().get("source", "auto"), w.set_source, 4),
             ("pills", tr("menu.done_after"), list(DONE_AFTER), lambda: w.done_after, w.set_done_after, 4),
             ("pills", tr("menu.corner"), [("tl", "↖"), ("tr", "↗"), ("bl", "↙"), ("br", "↘")],
              lambda: cs.load_config().get("corner", "tr") if not cs.load_config().get("pos") else None, w.set_corner, 4),
@@ -1466,7 +1505,7 @@ class Widget:
         elif outcome == "skip":                 # still fresh, or still rate limited
             self._next_fetch = max(self.st.retry_at, self.st.updated + POLL)
         else:
-            self._next_fetch = now + (20 if source() == "codex" else POLL)   # Codex: just a local file
+            self._next_fetch = now + (20 if source() in ("codex", "agy") else POLL)   # local files: cheap
 
     def setup_claude_code(self, ask=True):
         """Install Claude Code if needed and sign in, without any terminal: the only
@@ -1503,7 +1542,7 @@ class Widget:
 
     def no_usage(self):
         """No Claude Code session to read usage from: Clawdy works, the rings stay empty."""
-        return self.st.need in ("install", "login", "codex")
+        return self.st.need in ("install", "login", "codex", "agy")
 
     def start_intro(self):
         if self.pet:                                  # no rings to fill: just appear
@@ -1585,7 +1624,7 @@ class Widget:
     def show_alerts(self):
         while self._alerts:
             name, p, reset = self._alerts.pop(0)
-            who = "Codex" if (self.st.data or {}).get("source") == "codex" else "Claude"
+            who = source_name((self.st.data or {}).get("source"))
             body = tr("alert.body", who=who, t=until(reset)) if reset else tr("alert.body_nr", who=who)
             cs.notify(tr("alert.title", name=name, p=round(p)), body, self.tray)
             if self.v_sounds.get():
@@ -1641,7 +1680,7 @@ class Widget:
             if left is not None and left <= 0:
                 del self._renew[name]
                 if self.v_alerts.get() and -left < 3600:      # not hours late (e.g. after a long sleep)
-                    who = "Codex" if (self.st.data or {}).get("source") == "codex" else "Claude"
+                    who = source_name((self.st.data or {}).get("source"))
                     self.announce(tr("renew.title", name=name), tr("renew.body", p=round(p), who=who),
                                   "done", tr("renew.short"), (0.45, 0.78, 0.45))
                     self.force, self.act_t = "dance", 0.0
@@ -1659,7 +1698,7 @@ class Widget:
 
         def work():
             try:
-                title = tr("share.title_codex" if (self.st.data or {}).get("source") == "codex" else "share.title")
+                title = tr({"codex": "share.title_codex", "agy": "share.title_agy"}.get((self.st.data or {}).get("source"), "share.title"))
                 body = tuple(round(v * 255) for v in character.color_rgb(self.character_now()))
                 path = clawdy_share.save_card(clawdy_share.make_card(rows, title, tr("share.footer", link=clawdy_share.LINK), body=body))
             except Exception as e:
@@ -1712,7 +1751,7 @@ class Widget:
             # a session we weren't tracking (new, or idle long enough to be dropped): only
             # marks from the last half minute count, not what happened before we looked
             done0, ask0 = prev.get(sid, (now - 30, now - 30))
-            who = "Codex" if sid.startswith("codex-") else "Claude"
+            who = "Codex" if sid.startswith("codex-") else ("Gemini" if sid.startswith("agy-") else "Claude")
             where = os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else who
             ask, done = s.get("ask", 0), s.get("done", 0)
             # only a permission prompt stops a task halfway; "waiting for your reply"
@@ -3124,7 +3163,8 @@ class Widget:
     def draw_panel(self, px, rows, a):
         st = self.st
         x0, x1 = px + 11, px + PW - 11
-        title = "panel.title_codex" if (st.data or {}).get("source") == "codex" else "panel.title"
+        src = (st.data or {}).get("source")
+        title = {"codex": "panel.title_codex", "agy": "panel.title_agy"}.get(src, "panel.title")
         self.text(x0, 9, tr(title), hx(DIM, a), 5, bold=True)
         if not rows:
             self.text(px + PW / 2, H / 2, self.status_msg(), hx(DIM, a), 7, anchor="center")
@@ -3164,6 +3204,8 @@ class Widget:
         if st.error and st.retry_at > time.time():
             return tr("status.waiting", t=until(
                 datetime.fromtimestamp(st.retry_at, timezone.utc).isoformat()))
+        if (st.data or {}).get("note") and not st.error:
+            return tr(st.data["note"])
         return st.error or tr("status.loading")
 
     def draw_scene(self, top, k, ax, ay):
@@ -3580,7 +3622,7 @@ class Welcome:
         ttk.Label(body, wraplength=round(370 * k), justify="left",
                   text=tr("welcome.intro")
                   ).pack(anchor="w", pady=(6, 12))
-        if not cs.logged_in() and not codex.installed():
+        if not cs.logged_in() and not codex.installed() and not agy.installed():
             ttk.Label(body, wraplength=round(370 * k), justify="left", foreground="#b5482a",
                       text=tr("welcome.no_login")).pack(anchor="w", pady=(0, 12))
 
@@ -3588,7 +3630,7 @@ class Welcome:
         row.pack(anchor="w", pady=(0, 8))
         ttk.Label(row, text=tr("welcome.source")).pack(side="left", padx=(0, 8))
         self.v_source = tk.StringVar(value="auto")
-        for value, text in (("auto", tr("welcome.src_auto")), ("claude", "Claude"), ("codex", "Codex (GPT)")):
+        for value, text in (("auto", tr("welcome.src_auto")), ("claude", "Claude"), ("codex", "Codex (GPT)"), ("agy", "Gemini")):
             ttk.Radiobutton(row, text=text, value=value, variable=self.v_source).pack(side="left", padx=(0, 10))
         row = ttk.Frame(body)                       # which corner
         row.pack(anchor="w", pady=(0, 10))

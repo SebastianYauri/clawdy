@@ -184,6 +184,15 @@ def hook_entry():
     return dict(base, command="[ -f %s ] && %s || true" % (shlex.quote(target), run))
 
 
+def hook_command_prefix():
+    """`<program>` as one shell string, for tools that take a command line (Antigravity)."""
+    if WIN:
+        return '"%s"' % sys.executable if FROZEN else '"%s" "%s"' % (sys.executable, MAIN)
+    target = sys.executable if FROZEN else MAIN
+    run = shlex.quote(sys.executable) if FROZEN else "%s %s" % (shlex.quote(sys.executable), shlex.quote(MAIN))
+    return "[ -f %s ] && %s" % (shlex.quote(target), run)
+
+
 # ------------------------------------------------------------ hooks
 
 def _is_ours(h):
@@ -238,6 +247,12 @@ def set_hooks(on):
         data["hooks"] = hooks
     else:
         data.pop("hooks", None)
+    try:
+        import clawdy_agy                      # Antigravity CLI hooks come and go with these
+        if clawdy_agy.installed():
+            clawdy_agy.set_hooks(on)
+    except Exception:
+        pass
     if not data and not os.path.exists(SETTINGS):
         return None
     try:

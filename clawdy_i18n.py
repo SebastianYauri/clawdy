@@ -22,6 +22,12 @@ STRINGS = {
 
     "panel.title": ("Claude usage", "Uso de Claude"),
     "panel.title_codex": ("Codex usage", "Uso de Codex"),
+    "panel.title_agy": ("Gemini usage", "Uso de Gemini"),
+    "error.agy_none": ("Antigravity keeps its quota to itself: type /usage in agy", "Antigravity no comparte su cuota: escribe /usage en agy"),
+    "need.agy": ("Click to get Antigravity", "Clic para instalar Antigravity"),
+    "menu.chat_agy": ("New chat in Antigravity", "Nuevo chat en Antigravity"),
+    "chat.agy": ("chat in Antigravity", "chat en Antigravity"),
+    "share.title_agy": ("My Gemini usage", "Mi uso de Gemini"),
     "error.codex_none": ("use Codex once to see its usage", "usa Codex una vez para ver su uso"),
     "menu.source": ("Usage from", "Uso de"),
     "share.title_codex": ("My Codex usage", "Mi uso de Codex"),

@@ -21,7 +21,7 @@ ICON = os.path.join(DATA, "icons", "hicolor", "256x256", "apps", "clawdy.png")
 FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
          "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py",
          "clawdy_sessions.py", "clawdy_share.py", "clawdy_skins.py", "clawdy_codex.py",
-         "clawdy_character.py", "clawdy_creator.py", "clawdy_petgtk.py"]
+         "clawdy_character.py", "clawdy_creator.py", "clawdy_petgtk.py", "clawdy_agy.py"]
 
 
 def add_to_menu(main_py):
