@@ -7,6 +7,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 import zlib
 
@@ -86,13 +87,18 @@ def save_config(cfg):
     write_json(CONFIG, cfg)
 
 
+_config_lock = threading.Lock()
+
+
 def update_config(**changes):
-    cfg = load_config()
-    cfg.update(changes)
-    try:
-        save_config(cfg)
-    except OSError:
-        pass
+    """Read-modify-write under a lock: the fetch thread and the UI both call it."""
+    with _config_lock:
+        cfg = load_config()
+        cfg.update(changes)
+        try:
+            save_config(cfg)
+        except OSError:
+            pass
 
 
 # ------------------------------------------------------------ Claude session

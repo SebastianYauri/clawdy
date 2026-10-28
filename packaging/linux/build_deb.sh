@@ -16,11 +16,14 @@ install -d "$PKG/DEBIAN" "$PKG/usr/bin" "$PKG/usr/lib/clawdy/assets" \
 install -m 644 "$ROOT"/clawdy.py "$ROOT"/clawdy_gui.py "$ROOT"/clawdy_hook.py \
                "$ROOT"/clawdy_system.py "$ROOT"/clawdy_update.py "$ROOT"/clawdy_version.py \
                "$ROOT"/clawdy_i18n.py "$ROOT"/clawdy_tray.py "$ROOT"/clawdy_walk.py "$ROOT"/clawdy_sessions.py "$ROOT"/clawdy_share.py "$ROOT"/clawdy_skins.py "$ROOT"/clawdy_codex.py \
+               "$ROOT"/clawdy_character.py "$ROOT"/clawdy_creator.py \
                "$PKG/usr/lib/clawdy/"
 install -m 644 "$ROOT/assets/icon.png" "$ROOT/assets/alert.wav" "$ROOT/assets/done.wav" "$ROOT/assets/ask.wav" \
                "$PKG/usr/lib/clawdy/assets/"
-install -d "$PKG/usr/lib/clawdy/assets/skins"
-install -m 644 "$ROOT"/assets/skins/*.png "$PKG/usr/lib/clawdy/assets/skins/"
+for slot in head face body; do
+    install -d "$PKG/usr/lib/clawdy/assets/parts/$slot"
+    install -m 644 "$ROOT"/assets/parts/$slot/*.png "$PKG/usr/lib/clawdy/assets/parts/$slot/"
+done
 install -d "$PKG/usr/lib/clawdy/assets/codex-pet/clawdy"
 install -m 644 "$ROOT"/assets/codex-pet/clawdy/* "$PKG/usr/lib/clawdy/assets/codex-pet/clawdy/"
 install -m 644 "$ROOT/assets/icon.png" "$PKG/usr/share/icons/hicolor/256x256/apps/clawdy.png"

@@ -20,7 +20,8 @@ MENU = os.path.join(DATA, "applications", "clawdy.desktop")
 ICON = os.path.join(DATA, "icons", "hicolor", "256x256", "apps", "clawdy.png")
 FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
          "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py",
-         "clawdy_sessions.py", "clawdy_share.py", "clawdy_skins.py", "clawdy_codex.py"]
+         "clawdy_sessions.py", "clawdy_share.py", "clawdy_skins.py", "clawdy_codex.py",
+         "clawdy_character.py", "clawdy_creator.py"]
 
 
 def add_to_menu(main_py):
@@ -64,7 +65,8 @@ def main():
     for asset in ("icon.png", "alert.wav", "done.wav", "ask.wav"):
         shutil.copy2(os.path.join(SRC, "assets", asset), os.path.join(DEST, "assets", asset))
     shutil.rmtree(os.path.join(DEST, "assets", "skins"), ignore_errors=True)
-    shutil.copytree(os.path.join(SRC, "assets", "skins"), os.path.join(DEST, "assets", "skins"))
+    shutil.rmtree(os.path.join(DEST, "assets", "parts"), ignore_errors=True)
+    shutil.copytree(os.path.join(SRC, "assets", "parts"), os.path.join(DEST, "assets", "parts"))
     shutil.rmtree(os.path.join(DEST, "assets", "codex-pet"), ignore_errors=True)
     shutil.copytree(os.path.join(SRC, "assets", "codex-pet"), os.path.join(DEST, "assets", "codex-pet"))
     add_to_menu(main_py)

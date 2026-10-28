@@ -157,20 +157,21 @@ def dress(costume, kind):
     return []
 
 
-def pose(kind, frame=0, look=0, blink=False, costume="none"):
+def pose(kind, frame=0, look=0, blink=False, costume="none", col=None):
     """Rectangles (x, y, w, h, color) in sprite pixels on the GW x GH grid."""
     if kind == "bat":
         return bat(frame, blink)
     if kind in ("ghost", "boo"):
         return ghost(frame, kind == "boo", blink, look)
-    return plain(kind, frame, look, blink) + dress(costume, kind) + (broom() if kind == "broom" else [])
+    return plain(kind, frame, look, blink, col) + dress(costume, kind) + (broom() if kind == "broom" else [])
 
 
 def broom():
     return [(0, OY + 7, 11, 1, "#8a5a2b"), (11, OY + 6, 3, 3, "#d9b25a"), (14, OY + 6, 2, 3, "#b88a3a")]
 
 
-def plain(kind, frame=0, look=0, blink=False):
+def plain(kind, frame=0, look=0, blink=False, col=None):
+    ORANGE, ORANGE_D, DARK = col or (globals()["ORANGE"], globals()["ORANGE_D"], globals()["DARK"])
     R = [(OX + 2, OY, 10, 7, ORANGE)]                                   # body
     ey, eh = (OY + 3, 1) if blink else (OY + 2, 2)
     eyes = [(OX + 4 + look, ey, 1, eh, DARK), (OX + 9 + look, ey, 1, eh, DARK)]
@@ -218,6 +219,7 @@ class Walk:
         self.i = 0
         self.wave_until = 0.0
         self.costume = widget.costume()
+        self.colors = widget.body_colors()
         self.shaper = None
         self._last_key = None
 
@@ -296,7 +298,7 @@ class Walk:
         blink = (self.t % 3.3) < 0.12
         if kind == "walk" and self.costume == "frank":
             kind = "stomp"
-        rects = pose(kind, frame, look, blink, self.costume)
+        rects = pose(kind, frame, look, blink, self.costume, self.colors)
         key = (kind, frame, look, blink)
         if key != self._last_key:
             self._last_key = key

@@ -1,0 +1,8 @@
+{
+  "id": "clawdy-cowboy",
+  "displayName": "Clawdy",
+  "description": "Clawdy, the pixel buddy that shows your Claude and Codex usage (github.com/SebastianYauri/clawdy). It thinks, types, hammers away at commands, reads with a magnifying glass and throws confetti when the job is done.",
+  "spriteVersionNumber": 1,
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "animal"
+}

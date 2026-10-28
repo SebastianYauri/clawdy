@@ -67,9 +67,13 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
   coffee breaks, turbo typing with a keyboard on fire, a scrolling terminal, a
   magnifying glass, victory dances and fireworks. Leave it alone long enough and
   it takes a nap.
-- **Costumes.** Witch, pumpkin, ghost, vampire and Santa, each with its own
-  tricks and themed props. On *Auto* it dresses up by itself for Halloween and
-  Christmas.
+- **Make it yours.** **Customize skin…** opens a character creator: pick a body
+  color and mix heads (witch hat, Santa hat, cowboy, chef, pirate, astronaut
+  helmet, ninja band…), faces (glasses, eyepatch, fangs, stitches, blush) and
+  bodies (cape, scarf, bandana, ghost sheet, pumpkin…) with a live preview, or
+  hit *Random*. The classic costumes are one-click presets, each with its own
+  tricks and props, and *Auto* dresses up by itself for Halloween and Christmas.
+  Draw your own 32×32 skin in any pixel art editor and import it.
 - **Alerts near your limits.** At 80 % and 95 % of any limit Clawdy raises the
   alarm and sends a system notification, once per reset window.
 - **Will it last?** From your last hour of use the panel tells you, for each
@@ -208,11 +212,16 @@ Clawdy also has an icon in the system tray (the menu bar on macOS). Choose
 **Hide (keep in tray)** to tuck it away: it keeps running in the background and
 you can bring it back, or quit, from that icon.
 
-### Costumes
+### Costumes and skins
 
 <p align="center">
   <img src="docs/media/costumes.gif" alt="Classic, witch, pumpkin, ghost, vampire and Santa" width="620">
 </p>
+
+Right-click → **Settings… → Customize skin…** opens the character creator:
+color, head, face and body parts that combine freely (a green chef with
+glasses and a scarf is fine), presets for the classic costumes, a *Random*
+button, and **Import PNG…** for skins you draw yourself.
 
 The witch flies on her broom, reads a crystal ball while Claude thinks,
 writes in a spellbook and stirs a cauldron when commands run. The ghost floats
@@ -225,16 +234,16 @@ off as a bat, the ghost floats around and says boo, the witch rides her broom,
 the pumpkin bounces, Frankenstein climbs down to the bottom of the screen and
 stomps along it, and Santa keeps his hat on.
 
-### Draw your own costumes
+### Draw your own skin
 
-Costumes are small PNG images, so you can redraw them in any pixel art editor:
-[Pixelorama](https://pixelorama.org) (free, Windows/macOS/Linux), Aseprite,
-LibreSprite or Piskel. Open **Settings… → Design costumes…**: Clawdy exports
-today's costumes and a reference image of its body into a folder and opens it.
-Copy one out of `templates`, edit it, save, and Clawdy uses it within seconds,
-still jumping, spinning and squashing with it. Each image is 32×32 and every
-pixel is half a Clawdy pixel; `<costume>_back.png` goes behind Clawdy. Delete
-your file to go back to the built-in costume.
+Parts and skins are 32×32 PNGs (each pixel is half a Clawdy pixel), so you can
+draw them in any pixel art editor: [Pixelorama](https://pixelorama.org) (free,
+Windows/macOS/Linux), Aseprite, LibreSprite or Piskel. In the creator, **Draw
+my own…** exports a reference of Clawdy's body and your current look, flattened,
+into the skins folder and opens it; draw over them, save as `my-skin.png` and
+**Import PNG…** it (or just drop it in that folder). Leave the eyes clear so
+they keep blinking; `my-skin_back.png` goes behind Clawdy. Skins move with
+Clawdy: they jump, spin and squash too.
 
 ## Does it cost anything?
 

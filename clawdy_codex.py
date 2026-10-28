@@ -30,8 +30,12 @@ def _files(limit=40):
     """Newest session files first. Listing is cached for a few seconds: it's polled often."""
     now = time.time()
     if now - _listed[0] > 3:
-        paths = glob.glob(os.path.join(SESSIONS, "*", "*", "*", "*.jsonl"))
-        try:
+        paths = []
+        try:                                    # newest day folders first; stop once we have enough
+            for day in sorted(glob.glob(os.path.join(SESSIONS, "*", "*", "*")), reverse=True):
+                paths += glob.glob(os.path.join(day, "*.jsonl"))
+                if len(paths) >= 40:
+                    break
             paths.sort(key=os.path.getmtime, reverse=True)
         except OSError:
             pass
@@ -119,7 +123,6 @@ def usage():
         s = _parse(path)
         if s and s["limits"] and (not best or s["limits_ts"] > best["limits_ts"]):
             best = s
-            break                                # newest file with limits is enough
     if not best:
         return None
     rl, limits = best["limits"], []
@@ -129,7 +132,7 @@ def usage():
             continue
         reset = w.get("resets_at")
         if reset is None and w.get("resets_in_seconds") is not None:
-            reset = best["limits_ts"] + float(w["resets_in_seconds"])
+            reset = round((best["limits_ts"] + float(w["resets_in_seconds"])) / 60) * 60   # steady across polls
         iso = datetime.fromtimestamp(float(reset), timezone.utc).isoformat() if reset else None
         if (w.get("window_minutes") or 0) > 1440:
             kind = "weekly_all"
@@ -150,8 +153,9 @@ def sessions(now=None):
             continue
         s = _parse(path)
         if s:
+            took = max(0, s["done"] - s["started"]) if s["started"] and s["done"] >= s["started"] else 0
             out["codex-" + s["id"]] = {"state": s["state"], "ts": s["ts"], "started": s["started"],
-                                       "done": s["done"], "took": max(0, s["done"] - s["started"]),
+                                       "done": s["done"], "took": took,   # 0 when the start fell out of the tail
                                        "ask": s["ask"], "ask_kind": "permission" if s["ask"] else None,
                                        "cwd": s["cwd"]}
     return out

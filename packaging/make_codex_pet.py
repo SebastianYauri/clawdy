@@ -47,7 +47,7 @@ def render(costume, bg, out_dir):
     root.withdraw()
     w = g.Widget(root, demo=True)
     w.draw = w.update_view = lambda *a: None          # the widget's own loop stays quiet
-    w.costume_pref = costume
+    w.set_costume(costume)
     w.ready, w.intro_t0 = True, None
     for lim in w.st.data["limits"]:
         lim["percent"] = 12                           # calm pace: energy ≈ 1

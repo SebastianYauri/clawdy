@@ -153,15 +153,15 @@ def draw_rings(img, cx, cy, rings, width, bg):
                 break
 
 
-def draw_mascot(img, cx, cy, px):
+def draw_mascot(img, cx, cy, px, body=ORANGE):
     x0, y0 = cx - len(SPRITE[0]) * px / 2, cy - len(SPRITE) * px / 2
     for r, row in enumerate(SPRITE):
         for c, ch in enumerate(row):
             if ch != ".":
-                img.rect(x0 + c * px, y0 + r * px, px, px, EYE if ch == "E" else ORANGE)
+                img.rect(x0 + c * px, y0 + r * px, px, px, EYE if ch == "E" else body)
 
 
-def make_card(rows, title, footer=LINK):
+def make_card(rows, title, footer=LINK, body=ORANGE):
     """rows: [(label, percent, rgb 0-1, reset text)]. Returns PNG bytes."""
     img = Image(W, H, BG)
     img.rect(0, 0, W, 12, ORANGE)                       # top stripe
@@ -171,7 +171,7 @@ def make_card(rows, title, footer=LINK):
     rings = [(rad, p, tuple(round(v * 255) for v in col)) for (_, p, col, _), rad in zip(rows, radii)]
     rings += [(rad, 0, TRACK) for rad in radii[len(rows):]]
     draw_rings(img, cx, cy, rings, 24, PANEL)
-    draw_mascot(img, cx, cy, 18)
+    draw_mascot(img, cx, cy, 18, body)
 
     x, right = 620, 1150
     draw_text(img, x, 60, title, 5, TXT)

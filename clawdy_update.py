@@ -28,9 +28,13 @@ API = "https://api.github.com/repos/%s/releases/latest" % REPO
 RAW = "https://raw.githubusercontent.com/%s/%s/%s"
 SOURCE_FILES = ["clawdy.py", "clawdy_gui.py", "clawdy_hook.py", "clawdy_system.py",
                 "clawdy_update.py", "clawdy_version.py", "clawdy_i18n.py", "clawdy_tray.py", "clawdy_walk.py", "clawdy_sessions.py",
-                "clawdy_share.py", "clawdy_skins.py", "clawdy_codex.py", "assets/icon.png", "assets/alert.wav", "assets/done.wav",
-                "assets/ask.wav"] + ["assets/skins/%s.png" % n for n in ("witch", "santa", "frank", "vampire",
-                                                                       "vampire_back")] + ["assets/codex-pet/clawdy/pet.json", "assets/codex-pet/clawdy/spritesheet.webp"]
+                "clawdy_share.py", "clawdy_skins.py", "clawdy_codex.py", "clawdy_character.py", "clawdy_creator.py",
+                "assets/icon.png", "assets/alert.wav", "assets/done.wav", "assets/ask.wav",
+                "assets/codex-pet/clawdy/pet.json", "assets/codex-pet/clawdy/spritesheet.webp"] + [
+                "assets/parts/%s/%s.png" % (slot, name) for slot, names in (
+                    ("head", ("witch", "santa", "frank", "slick", "cowboy", "chef", "pirate", "astronaut", "ninja")),
+                    ("face", ("stitches", "fangs", "glasses", "eyepatch", "blush")),
+                    ("body", ("bolts", "scarf", "bandana", "sheet", "pumpkin", "cape_back"))) for name in names]
 RETRY_AFTER = 24 * 3600             # don't retry a failed version for a day
 
 

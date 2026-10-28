@@ -23,6 +23,7 @@ import clawdy_sessions as sessions
 import clawdy_codex as codex
 import clawdy_share
 import clawdy_skins
+import clawdy_character as character
 from clawdy_version import VERSION
 
 tk = None            # imported in run(): the hook doesn't need tkinter
@@ -40,7 +41,6 @@ SCENE_K = 0.62                      # …and scaled down by this
 RING_C = (52, 54)                   # ring center
 RING_RS = (48, 43, 38)              # nested, thin, close to the edge
 RING_W = 3.5
-HAT_TOP = {"witch": -56, "santa": -52, "pumpkin": -38, "frank": -37}   # sprite units; the body spans -27..27
 HOP = 0.42                          # lower jumps: Clawdy lives inside the rings
 REACH = 0.55                        # floating props are pulled closer…
 PART_REACH = 0.6                    # …and particles too, so they fit in the porthole
@@ -302,6 +302,8 @@ def fetch(st):
     """One usage request. Returns "ok", "expired", "rate", "auth", "offline", "error" or "skip"."""
     if source() == "codex":
         return fetch_codex(st)
+    if (st.data or {}).get("source") == "codex":
+        st.data, st.updated = None, 0.0         # cached Codex numbers: not Claude's
     if time.time() < st.retry_at or st.fresh():
         return "skip"
     try:
@@ -567,7 +569,15 @@ class Widget:
         self.panel_out, self._ppos, self._palpha = False, None, None
         self.upd_state, self.upd_info, self.upd_msg, self.upd_msg_until = None, None, None, 0.0
         self.upd_quit = False
-        self.costume_pref = cs.load_config().get("costume", "auto")
+        cfg0 = cs.load_config()
+        self.costume_pref = cfg0.get("costume", "auto")
+        self.character = character.load(cfg0)
+        if self.costume_pref in character.PRESETS and not cfg0.get("character"):   # settings from older versions
+            self.character = character.preset(self.costume_pref)
+            self.costume_pref = "custom"
+        elif self.costume_pref not in ("auto", "custom"):
+            self.costume_pref = "custom"
+        self._hat = {}
         self.force, self.batform, self._was_bat, self.fly_dy = None, False, False, 0.0
         self._bat_at = 0.0
         self.dbg = None
@@ -624,7 +634,7 @@ class Widget:
         self.alarm_until, self.alarm_text = 0.0, ""
         self.v_tasks = tk.BooleanVar(value=cs.load_config().get("tasks", True))
         self.done_after = int(cs.load_config().get("done_after", 300))
-        self._marks, self._asked = None, {}
+        self._marks, self._asked, self._told = None, {}, {}
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.held = False                    # being carried around with the mouse
         self.skins = clawdy_skins.Skins(tk)  # costumes drawn in a pixel art editor, if any
@@ -649,7 +659,8 @@ class Widget:
         self.fam = self.pick_font(["Segoe UI", "DejaVu Sans", "Helvetica Neue", "Helvetica"])
         self.mono = self.pick_font(["Consolas", "DejaVu Sans Mono", "Menlo", "Courier"])
 
-        self._next_fetch, self._backoff, self._fetching = 0.0, 0, False
+        self._next_fetch, self._backoff, self._fetching, self._gen = 0.0, 0, False, 0
+        self._pace = {}                        # limit name -> seconds until full, from after_data
         self._stamp, self._last_sync = cs.session_stamp(), time.time()
         self.sync()
         if not demo:
@@ -788,19 +799,75 @@ class Widget:
         return None
 
     def costume(self):
+        """Which built-in costume Clawdy behaves like right now (tricks, walks, props)."""
         if self.costume_pref == "auto":
             return {"halloween": "witch", "christmas": "santa"}.get(season(), "none")
-        return self.costume_pref
+        return character.identity(self.character)
+
+    def character_now(self):
+        if self.costume_pref == "auto":
+            return character.preset(self.costume(), self.character["color"])
+        return self.character
 
     def set_costume(self, value):
-        self.costume_pref = value
-        cfg = cs.load_config()
-        cfg["costume"] = value
-        try:
-            cs.save_config(cfg)
-        except OSError:
-            pass
+        """A preset by name, or "auto" for the seasonal one."""
+        if value == "auto":
+            self.costume_pref = "auto"
+            cs.update_config(costume="auto")
+        else:
+            self.set_character(character.preset(value, self.character["color"]))
         self.force, self.act_t = "special", 0.0                   # show it off right away
+
+    def set_character(self, ch):
+        self.character, self.costume_pref = ch, "custom"
+        character.save(ch)
+        cs.update_config(costume="custom")
+        self._hat = {}
+        if self.tray:
+            self.tray.refresh()
+
+    def body_colors(self, ch=None):
+        """(body, legs, eyes) Tk colors for a character."""
+        rgb = character.color_rgb(ch or self.character_now())
+        lum = 0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2]
+        eyes = DARK if lum > 0.35 else (0.96, 0.94, 0.90)
+        return hx(rgb), hx(tuple(c * 0.82 for c in rgb)), hx(eyes)
+
+    def hat_top(self, ch=None):
+        """Sprite y of the highest pixel of what's on Clawdy's head (-27 = bare)."""
+        ch = ch or self.character_now()
+        key = tuple(ch.get(k) for k in ("head", "face", "body", "skin"))
+        if key not in self._hat:
+            top = -27
+            for path in character.layers(ch, "front"):
+                for _, y, _, _, _ in self.skins.runs(path) or []:
+                    top = min(top, y)
+            self._hat[key] = top
+        return self._hat[key]
+
+    def draw_still(self, canvas, cx, cy, scale, ch=None, eye="open"):
+        """Clawdy standing still, drawn onto another canvas (previews)."""
+        saved, self.canvas = self.canvas, canvas
+        try:
+            xf = Xform(cx, cy, scale, scale)
+            self.draw_costume(xf, None, "back", 0, 0.6, eye, 0, ch)
+            self.draw_sprite(xf, 0, 0, eye, 0, 0, None, False, ch)
+            self.draw_costume(xf, None, "front", 0, 0.6, eye, 0, ch)
+        finally:
+            self.canvas = saved
+
+    def open_creator(self):
+        from clawdy_creator import Creator
+        if self.popup_menu:
+            self.popup_menu.close()
+        if self.hidden:
+            x, y = self.root.winfo_pointerxy()
+        else:
+            x = self.root.winfo_rootx() - round(400 * self.k) - 8
+            if x < 4:
+                x = self.root.winfo_rootx() + self.root.winfo_width() + 8
+            y = max(4, self.root.winfo_rooty() - 120)
+        self.popup_menu = Creator(self, x, y)
 
     def set_scale(self, scale):
         """Resize the widget now and remember it."""
@@ -1108,19 +1175,19 @@ class Widget:
              lambda: cs.load_config().get("source", "auto"), w.set_source, 3),
             ("pills", tr("menu.done_after"), list(DONE_AFTER), lambda: w.done_after, w.set_done_after, 4),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
-            ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in PopupMenu.COSTUMES],
-             lambda: w.costume_pref, w.set_costume, 3),
-            ("action", tr("menu.design"), w.design_costumes),
+            ("action", tr("menu.skin"), lambda: w.root.after(50, w.open_creator)),
             ("action", tr("menu.codexpet"), w.install_codex_pet),
         ]
 
     def design_costumes(self):
-        """Export today's costumes as PNG templates and open the folder to edit them."""
+        """Export a body reference and the current look as PNGs and open the folder to draw over them."""
         try:
-            costumes = [c for c in PopupMenu.COSTUMES if c not in ("auto", "none")]
-            colors = {"X": hx(ORANGE), "A": hx(ORANGE), "L": hx(ORANGE_D), "E": hx(DARK)}
-            clawdy_skins.export_templates(self, costumes, tk, SPRITE, colors)
-            clawdy_share.show(clawdy_skins.folder())
+            body, legs, eyes = self.body_colors()
+            colors = {"X": body, "A": body, "L": legs, "E": eyes}
+            ch = self.character_now()
+            paths = character.layers(ch, "back") + character.layers(ch, "front")
+            folder = clawdy_skins.export_templates(self, tk, SPRITE, colors, paths, self.skins)
+            clawdy_share.show(folder)
         except Exception as e:
             self.log("design", e)
             self.flash(tr("share.failed"), 4)
@@ -1173,9 +1240,16 @@ class Widget:
             return
         self._fetching = True
 
+        gen = self._gen
+
         def work():
             try:
-                self._after_fetch(fetch(self.st))
+                outcome = fetch(self.st)
+                if gen != self._gen:            # the source changed meanwhile: drop this result
+                    self.st.data, self.st.updated, self.st.error = None, 0.0, None
+                    self._next_fetch = 0.0
+                    return
+                self._after_fetch(outcome)
             finally:
                 self._fetching = False
         threading.Thread(target=work, daemon=True).start()
@@ -1313,7 +1387,8 @@ class Widget:
     def show_alerts(self):
         while self._alerts:
             name, p, reset = self._alerts.pop(0)
-            body = tr("alert.body", t=until(reset)) if reset else tr("alert.body_nr")
+            who = "Codex" if (self.st.data or {}).get("source") == "codex" else "Claude"
+            body = tr("alert.body", who=who, t=until(reset)) if reset else tr("alert.body_nr", who=who)
             cs.notify(tr("alert.title", name=name, p=round(p)), body, self.tray)
             if self.v_sounds.get():
                 cs.play_sound("alert")
@@ -1342,12 +1417,16 @@ class Widget:
                 cs.write_json(os.path.join(cs.cache_dir(), "history.json"), self.hist)
             except OSError:
                 pass
+        self._pace = {}
         for name, p, reset in rows:
             if p >= RENEW_FROM and reset:
                 self._renew[name] = (p, reset)
+            eta = pace(self.hist, name, p, reset, now) if reset else None
+            if eta:
+                self._pace[name] = eta + now    # when it would be full
             if not (reset and self.v_alerts.get()) or p >= ALERT_AT[-1]:
                 continue
-            eta, left = pace(self.hist, name, p, reset, now), secs_until(reset)
+            left = secs_until(reset)
             if eta and left and eta < left and eta <= PACE_ALERT:
                 seen = cs.load_config().get("paced") or []
                 key = "%s|%s" % (name, reset)
@@ -1364,7 +1443,8 @@ class Widget:
             if left is not None and left <= 0:
                 del self._renew[name]
                 if self.v_alerts.get() and -left < 3600:      # not hours late (e.g. after a long sleep)
-                    self.announce(tr("renew.title", name=name), tr("renew.body", p=round(p)),
+                    who = "Codex" if (self.st.data or {}).get("source") == "codex" else "Claude"
+                    self.announce(tr("renew.title", name=name), tr("renew.body", p=round(p), who=who),
                                   "done", tr("renew.short"), (0.45, 0.78, 0.45))
                     self.force, self.act_t = "dance", 0.0
 
@@ -1382,7 +1462,8 @@ class Widget:
         def work():
             try:
                 title = tr("share.title_codex" if (self.st.data or {}).get("source") == "codex" else "share.title")
-                path = clawdy_share.save_card(clawdy_share.make_card(rows, title, tr("share.footer", link=clawdy_share.LINK)))
+                body = tuple(round(v * 255) for v in character.color_rgb(self.character_now()))
+                path = clawdy_share.save_card(clawdy_share.make_card(rows, title, tr("share.footer", link=clawdy_share.LINK), body=body))
             except Exception as e:
                 self.root.after(0, lambda: self.flash(tr("share.failed", e=str(e)[:40])))
                 return
@@ -1399,8 +1480,9 @@ class Widget:
     def set_source(self, value):
         """Claude or Codex: forget the other one's numbers and read again now."""
         cs.update_config(source=value)
+        self._gen += 1                          # results of a fetch already running are discarded
         self.st.data, self.st.updated, self.st.retry_at, self.st.error = None, 0.0, 0.0, None
-        self.hist, self._renew = [], {}
+        self.hist, self._renew, self._pace = [], {}, {}
         self._next_fetch = 0.0
         self.refresh()
 
@@ -1427,8 +1509,11 @@ class Widget:
         self._marks = {sid: (s.get("done", 0), s.get("ask", 0)) for sid, s in found.items()}
         if first or self.demo or not self.v_tasks.get():
             return                              # at start-up, only remember what was already there
+        now = time.time()
         for sid, s in found.items():
-            done0, ask0 = prev.get(sid, (0, 0))
+            # a session we weren't tracking (new, or idle long enough to be dropped): only
+            # marks from the last half minute count, not what happened before we looked
+            done0, ask0 = prev.get(sid, (now - 30, now - 30))
             who = "Codex" if sid.startswith("codex-") else "Claude"
             where = os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else who
             ask, done = s.get("ask", 0), s.get("done", 0)
@@ -1439,7 +1524,8 @@ class Widget:
                 self._asked[sid] = ask
                 self.announce(tr("task.ask_title", who=who), tr("task.permission", where=where), "ask",
                               tr("task.ask_short"), ORANGE)
-            elif done > done0 and s.get("took", 0) >= self.done_after:
+            elif done > done0 and done > self._told.get(sid, 0) and s.get("took", 0) >= self.done_after:
+                self._told[sid] = done
                 self.announce(tr("task.done_title", who=who), tr("task.done_body", where=where, t=duration(s["took"])),
                               "done", tr("task.done_short"), (0.45, 0.78, 0.45))
 
@@ -2018,7 +2104,7 @@ class Widget:
                 a = t * 7
                 # a halo above the head (and the hat); particles get pulled toward the
                 # center by PART_REACH, so the offsets are spread out to make up for it
-                lift = (min(HAT_TOP.get(self.costume(), -27), -27) - 10) / PART_REACH
+                lift = (min(self.hat_top(), -27) - 10) / PART_REACH
                 self.spawn("star", cx + self.pos + math.cos(a) * 24 / PART_REACH,
                            by - SH / 2 + lift + math.sin(a) * 4 / PART_REACH,
                            0, 0, 0.25, col=(1.0, 0.85, 0.3))
@@ -2174,7 +2260,7 @@ class Widget:
         self.draw_sprite(xf, arm_l, arm_r, eye, 0, -1, step, tuck)
         self.draw_costume(xf, costume, "front", t, 0.6, eye, 0)
         top_y = by + dy - SH * sy
-        hat = (-HAT_TOP.get(costume, -27) - 27) * 0.8
+        hat = (-self.hat_top() - 27) * 0.8
         R = 11
         if it < throw_at:                                    # carried above the head
             self.ball = None
@@ -2218,8 +2304,8 @@ class Widget:
         self.oval(x, y, 2.5, 2.5, hx((0.97, 0.95, 0.92), a))
         self.oval(x - r * 0.4, y - r * 0.45, 2.5, 2, hx((1, 1, 1), 0.8 * a))
 
-    def draw_sprite(self, xf, arm_l, arm_r, eye, eye_dx, eye_dy, step, tuck):
-        orange, orange_d, dark = hx(ORANGE), hx(ORANGE_D), hx(DARK)
+    def draw_sprite(self, xf, arm_l, arm_r, eye, eye_dx, eye_dy, step, tuck, ch=None):
+        orange, orange_d, dark = self.body_colors(ch)
         x0, y0 = -SW / 2, -SH / 2
         for key, r0, c0, r1, c1 in BLOCKS:
             x, y = x0 + c0 * PX, y0 + r0 * PX
@@ -2275,109 +2361,13 @@ class Widget:
         self.poly([(x - 4, y + 6), (x - 1, y + 6), (x - 2.5, y + 10)], white)
         self.poly([(x + 1, y + 6), (x + 4, y + 6), (x + 2.5, y + 10)], white)
 
-    def draw_costume(self, xf, c, layer, t, glow, eye, eye_dx):
-        """Costumes share Clawdy's transform, so they jump, spin and squash with
-        it. Sprite coordinates: body x ±30, y -27..15."""
-        runs = self.skins.runs(c, layer)            # a PNG from the skins folder wins
-        if runs is not None:
-            for x, y, w, h, col in runs:
+    def draw_costume(self, xf, c, layer, t, glow, eye, eye_dx, ch=None):
+        """The character's layers (parts and skins, as PNG rectangles) share Clawdy's
+        transform, so they jump, spin and squash with it. `c` is kept for callers."""
+        ch = ch or self.character_now()
+        for path in character.layers(ch, layer):
+            for x, y, w, h, col in self.skins.runs(path) or []:
                 self.px_rect(xf, x, y, col, w, h)
-            return
-        if c == "none":
-            return
-
-        def b(x, y, w, h, col):
-            self.px_rect(xf, x, y, hx(col), w, h)
-
-        def tri(pts, col):
-            self.poly([xf.pt(x, y) for x, y in pts], hx(col))
-
-        dark = (0.08, 0.06, 0.07)
-        if c == "vampire" and layer == "back":            # cape goes behind
-            tri([(-36, -23), (36, -23), (45, 29), (-45, 29)], (0.45, 0.40, 0.52))   # light rim
-            tri([(-34, -21), (34, -21), (42, 27), (-42, 27)], (0.09, 0.07, 0.10))
-            tri([(-34, -21), (-28, -21), (-34, 27), (-42, 27)], (0.62, 0.10, 0.15))
-            tri([(34, -21), (28, -21), (34, 27), (42, 27)], (0.62, 0.10, 0.15))
-            return
-        if layer == "back":
-            return
-
-        if c == "witch":
-            # Purple disappears on the dark card: a light rim drawn first peeks
-            # out around the silhouette, plus a highlight on the crown.
-            hat = [(-36, -31, 72, 4), (-18, -37, 36, 6), (-12, -43, 24, 6),
-                   (-6, -49, 15, 6), (2, -54, 12, 5), (10, -52, 8, 4)]
-            rim, brim, cone = (0.80, 0.66, 0.98), (0.40, 0.22, 0.62), (0.55, 0.31, 0.82)
-            for x, y, w, h in hat:
-                b(x - 2, y - 2, w + 4, h + 4, rim)
-            b(*hat[0], brim)                              # brim
-            for x, y, w, h in hat[1:]:
-                b(x, y, w, h, cone)
-            b(-12, -43, 4, 6, (0.70, 0.50, 0.95))         # highlight
-            b(-6, -49, 3, 6, (0.70, 0.50, 0.95))
-            b(-18, -37, 36, 3, (0.98, 0.58, 0.16))        # band
-            b(-3, -37, 6, 3, (1.0, 0.88, 0.35))           # buckle
-            b(1, -47, 3, 3, (1.0, 0.88, 0.35))            # star
-        elif c == "santa":
-            red, white = (0.86, 0.16, 0.16), (0.97, 0.97, 0.97)
-            b(-24, -39, 48, 6, red)
-            b(-16, -45, 34, 6, red)
-            b(-4, -50, 26, 5, red)
-            b(16, -48, 10, 8, red)                        # droops to the side
-            b(-32, -33, 64, 6, white)                     # fur trim
-            o = xf.pt(29, -40)
-            self.oval(o[0], o[1], 4.5, 4.5, hx(white))    # pompom
-        elif c == "pumpkin":
-            rib = (0.76, 0.38, 0.26)
-            b(-14, -27, 3, 42, rib)                       # ribs
-            b(11, -27, 3, 42, rib)
-            b(-3, -35, 6, 8, (0.33, 0.55, 0.22))          # stem
-            tri([(3, -33), (13, -38), (9, -29)], (0.40, 0.66, 0.28))
-            b(-21, -17, 12, 16, ORANGE)                   # cover the usual eyes
-            b(9, -17, 12, 16, ORANGE)
-            lit = tuple(min(1.0, 0.55 + 0.45 * glow * c2) for c2 in (1.0, 0.85, 0.35))
-            tri([(-20, -5), (-10, -5), (-15, -15)], lit)  # carved eyes, lit from inside
-            tri([(10, -5), (20, -5), (15, -15)], lit)
-            tri([(-16, 2), (16, 2), (12, 9), (6, 5), (0, 10), (-6, 5), (-12, 9)], lit)
-        elif c == "ghost":
-            white, shade = (0.95, 0.95, 0.98), (0.80, 0.81, 0.87)
-            b(-21, -34, 42, 3, white)
-            b(-27, -31, 54, 4, white)
-            b(-33, -27, 66, 46, white)
-            b(-33, 15, 66, 2, shade)
-            for i in range(4):                            # wavy hem
-                b(-33 + i * 18, 19, 12, 4 + 3 * abs(math.sin(t * 5 + i)), white)
-            ex = eye_dx
-            if eye in ("closed", "happy", "back"):
-                if eye != "back":
-                    b(-18 + ex, -9, 7, 2, dark)
-                    b(12 + ex, -9, 7, 2, dark)
-            else:
-                h = 12 if eye == "scared" else 9
-                b(-18 + ex, -15, 7, h, dark)
-                b(12 + ex, -15, 7, h, dark)
-                if eye == "scared":
-                    b(-4, 0, 8, 7, dark)                  # "boo" mouth
-        elif c == "frank":
-            hair, rim, metal, lit = (0.10, 0.09, 0.11), (0.42, 0.40, 0.45), (0.62, 0.64, 0.68), (0.85, 0.87, 0.90)
-            b(-32, -36, 64, 15, rim)                      # light rim so the flat top reads on dark
-            b(-30, -34, 60, 12, hair)                     # flat-top hair over the forehead
-            for x in (-26, -14, -2, 10, 22):              # jagged fringe
-                tri([(x, -22), (x + 6, -22), (x + 3, -17)], hair)
-            stitch = (0.45, 0.22, 0.20)
-            b(-26, 3, 14, 2, stitch)                      # stitches on the cheek
-            for x in (-24, -19, -14):
-                b(x, 1, 2, 6, stitch)
-            for d in (-1, 1):                             # neck bolts
-                b(d * 34 - (8 if d < 0 else 0), 2, 8, 6, metal)
-                b(d * 34 - (8 if d < 0 else 0) + (0 if d < 0 else 6), 1, 2, 8, lit)
-        elif c == "vampire":
-            hair = (0.12, 0.10, 0.14)                     # visible on orange
-            b(-30, -27, 60, 5, hair)
-            tri([(-8, -22), (8, -22), (0, -15)], hair)    # widow's peak
-            if eye != "back":
-                tri([(-8, 1), (-3, 1), (-5.5, 7)], (0.97, 0.97, 0.97))      # fangs
-                tri([(3, 1), (8, 1), (5.5, 7)], (0.97, 0.97, 0.97))
 
     def draw_props(self, props, bx, by, bt, t, arm_r):
         """Floating props are pulled towards Clawdy so the whole animation fits in
@@ -2488,12 +2478,12 @@ class Widget:
                     self.oval(bx + math.cos(a) * 36, bt + 2 - abs(math.sin(a)) * 24, 9, 9, hx(col))
             elif pr in ("bang", "err"):
                 col = (0.95, 0.75, 0.20) if pr == "bang" else (0.90, 0.30, 0.25)
-                yb = bt - 26 - abs(math.sin(t * 7)) * 4 - (-HAT_TOP.get(costume, -27) - 27) * 1.1   # above any hat
+                yb = bt - 26 - abs(math.sin(t * 7)) * 4 - (-self.hat_top() - 27) * 1.1   # above any hat
                 self.oval(bx, yb, 13, 13, hx(col))
                 self.text(bx, yb, "!", dark, 14, bold=True, anchor="center")
             elif pr == "bulb":
                 on = getattr(self, "bulb", 0.0)
-                ox, oy = (bx + SW / 2 + 20, bt - 18) if costume in HAT_TOP else (bx, bt - 34)   # beside a hat
+                ox, oy = (bx + SW / 2 + 20, bt - 18) if self.hat_top() < -32 else (bx, bt - 34)   # beside a hat
                 if on:
                     self.oval(ox, oy, 30, 30, hx((1.0, 0.92, 0.45), 0.22))
                     for i in range(8):
@@ -2659,7 +2649,7 @@ class Widget:
         mark = self.canvas.create_line(0, 0, 0, 0)
         top = max((p for _, p, _ in rows), default=0)
         # Center the whole figure, hat included, in the porthole.
-        drop = (-HAT_TOP.get(self.costume(), -27) - 27) / 2 * SCENE_K
+        drop = (-self.hat_top() - 27) / 2 * SCENE_K
         self.draw_scene(top, SCENE_K, RING_C[0], RING_C[1] + drop)
         pmark = self.canvas.create_line(0, 0, 0, 0)
         self.plus()
@@ -2838,8 +2828,9 @@ class Widget:
                     self.text(x1 - 26, y, until(reset), hx(DIM, a), 5, anchor="e")
                 else:
                     self.text(x0, y + 15, tr("time.resets_in", t=until(reset)), hx(DIM, a), 5)
-                    eta, left = pace(self.hist, name, p, reset, time.time()), secs_until(reset)
-                    if eta and left:
+                    full_at, left = self._pace.get(name), secs_until(reset)
+                    eta = full_at - time.time() if full_at else None
+                    if eta and eta > 0 and left:
                         if eta < left:
                             self.text(x1, y + 15, tr("pace.full", t=duration(eta)), hx((0.95, 0.45, 0.38), a),
                                       5, bold=True, anchor="e")
@@ -3033,7 +3024,6 @@ class PopupMenu:
     pills instead of checkboxes and submenus."""
 
     MW, ROW, PAD = 236, 26, 10
-    COSTUMES = ("auto", "none", "witch", "pumpkin", "ghost", "vampire", "frank", "santa")
 
     def __init__(self, w, x_root, y_root, items=None, width=None):
         self.w, self.k = w, w.k
@@ -3066,6 +3056,7 @@ class PopupMenu:
         self.win.update_idletasks()
         w.round_corners(self.win, pw, ph, radius=12)
         c = self.canvas
+        c.bind("<Enter>", self.on_motion)
         c.bind("<Motion>", self.on_motion)
         c.bind("<Leave>", self.on_leave)
         c.bind("<Button-1>", self.on_click)

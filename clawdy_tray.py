@@ -52,6 +52,15 @@ class Tray:
             return lambda icon, item: self.calls.put(fn)
 
         from clawdy_version import VERSION
+        import clawdy_character as character
+
+        def chosen():
+            if w.costume_pref == "auto":
+                return "auto"
+            return next((p for p in character.PRESET_ORDER if character.matches(w.character, p)), None)
+        costumes = P.Menu(*[Item(tr("costume." + p), call(lambda p=p: (w.set_costume(p), self.refresh())),
+                                 checked=lambda item, p=p: chosen() == p, radio=True)
+                            for p in ["auto"] + character.PRESET_ORDER])
         return P.Menu(
             Item("Clawdy v" + VERSION, None, enabled=False),
             P.Menu.SEPARATOR,
@@ -63,6 +72,8 @@ class Tray:
             Item(tr("menu.updates"), call(lambda: w.check_updates(True))),
             P.Menu.SEPARATOR,
             Item(tr("menu.settings"), call(w.open_settings)),
+            Item(tr("menu.costume"), costumes),
+            Item(tr("menu.skin"), call(w.open_creator)),
             P.Menu.SEPARATOR,
             Item(tr("menu.quit"), call(w.root.destroy)),
         )

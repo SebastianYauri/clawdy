@@ -6,7 +6,8 @@
 | Folder | Pet |
 |---|---|
 | `clawdy` | Clawdy |
-| `clawdy-witch` · `clawdy-pumpkin` · `clawdy-ghost` · `clawdy-vampire` · `clawdy-frank` · `clawdy-santa` | Clawdy in costume |
+| `clawdy-witch` · `clawdy-pumpkin` · `clawdy-ghost` · `clawdy-vampire` · `clawdy-frank` · `clawdy-santa` | Clawdy in its classic costumes |
+| `clawdy-cowboy` · `clawdy-chef` · `clawdy-pirate` · `clawdy-astronaut` · `clawdy-ninja` | …and the new ones |
 
 ## Install
 
