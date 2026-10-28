@@ -121,10 +121,14 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
 - **Gemini too, via Antigravity CLI.** Google replaced Gemini CLI with the
   Antigravity CLI (`agy`); Clawdy hooks into it (`~/.gemini/config/hooks.json`,
   installed with *React to Claude Code*) and acts out what it does, counts its
-  sessions in the crew and notifies when a task is done. Antigravity doesn't
-  share its quota with other programs, so the rings only fill when its log
-  says the quota ran out (with the reset time); **+** opens `agy` and the chats
-  tree resumes its conversations.
+  sessions in the crew and notifies when a task is done. For the quota,
+  Antigravity only talks to its own child processes, so Clawdy registers
+  itself in `agy` as a tiny MCP server with no tools (**Settings… → Show
+  Gemini quota**, or `agy mcp add clawdy <clawdy> --agy-mcp`): while `agy`
+  runs it reads the quota summary once a minute, per model pool (Gemini ·
+  Claude and GPT) and window (5 h · weekly). With the Antigravity desktop app
+  open, Clawdy reads its language server directly, like other quota trackers
+  do. **+** opens `agy` and the chats tree resumes its conversations.
 - **Free and private.** No API key, no extra cost, no servers, no telemetry.
 - **English and Spanish**, following your system language.
 
