@@ -23,13 +23,23 @@ def send(obj):
 
 
 def poll():
-    endpoint = agy.endpoint_from_env()
+    endpoints = agy.endpoints_from_env()
+    status = {"token": bool(os.environ.get("ANTIGRAVITY_CSRF_TOKEN")),
+              "vars": sorted(k for k in os.environ if k.startswith("ANTIGRAVITY_")),
+              "endpoints": [(s, h, p) for s, h, p, _ in endpoints], "ok": None, "error": None}
     while True:
-        if endpoint:
+        for endpoint in endpoints:
             try:
-                agy.refresh_quota(endpoint)
-            except Exception:
-                pass
+                rows = agy.refresh_quota(endpoint)
+                status["ok"], status["error"], status["rows"] = time.time(), None, len(rows)
+                break
+            except Exception as e:
+                status["error"] = "%s %s: %s" % (endpoint[0], endpoint[2], str(e)[:100])
+        try:
+            import clawdy_system as cs
+            cs.write_json(agy.STATUS_FILE, status)          # names and outcomes only: never the token
+        except Exception:
+            pass
         time.sleep(EVERY)
 
 

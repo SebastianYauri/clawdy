@@ -108,22 +108,31 @@ SERVICE = "/exa.language_server_pb.LanguageServerService"
 METADATA = {"metadata": {"ideName": "antigravity", "extensionName": "antigravity", "ideVersion": "unknown", "locale": "en"}}
 
 
-def endpoint_from_env():
-    """(scheme, host, port, token) handed to agy's child processes, or None."""
+def endpoints_from_env():
+    """[(scheme, host, port, token)] to try, from what agy hands its child processes: the
+    sidecar web port speaks plain HTTP, the language server address is usually the TLS one."""
     token = os.environ.get("ANTIGRAVITY_CSRF_TOKEN")
-    addr = os.environ.get("ANTIGRAVITY_LS_ADDRESS") or ""
-    port = os.environ.get("ANTIGRAVITY_SIDECAR_WEB_PORT") or ""
     if not token:
-        return None
-    scheme, host = "http", "127.0.0.1"
+        return []
+    out = []
+    port = os.environ.get("ANTIGRAVITY_SIDECAR_WEB_PORT") or ""
+    if port.isdigit():
+        out.append(("http", "127.0.0.1", int(port), token))
+    addr = os.environ.get("ANTIGRAVITY_LS_ADDRESS") or ""
+    scheme = None
     if "://" in addr:
         scheme, addr = addr.split("://", 1)
-    if ":" in addr:
-        host, addr_port = addr.rsplit(":", 1)
-        port = port or addr_port
-    if not port.isdigit():
-        return None
-    return scheme, host or "127.0.0.1", int(port), token
+    host, _, aport = addr.rpartition(":")
+    if aport.isdigit():
+        host = host or "127.0.0.1"
+        for sc in ([scheme] if scheme else ["https", "http"]):
+            out.append((sc, host, int(aport), token))
+    return out
+
+
+def endpoint_from_env():
+    eps = endpoints_from_env()
+    return eps[0] if eps else None
 
 
 def endpoints_from_processes():
@@ -204,6 +213,9 @@ def refresh_quota(endpoint):
     if rows:
         cs.write_json(QUOTA_FILE, {"updated": time.time(), "rows": rows})
     return rows
+
+
+STATUS_FILE = os.path.join(cs.cache_dir(), "agy-mcp-status.json")
 
 
 def ask_server_quota():
