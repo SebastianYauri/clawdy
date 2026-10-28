@@ -644,8 +644,6 @@ class Widget:
         self.v_pet = tk.BooleanVar(value=self.pet)
         self.pet_shaper, self.cur_act, self._pet_mon = None, None, None
         self.part_fx = {}                    # per-slot (dx, dy, rot) wobble for the current frame
-        self.pet_roaming = bool(cs.load_config().get("pet_roam", True))
-        self.pet_tools, self._pet_hover = [], 0.0   # the little buttons above a hovered pet
         self.skins = clawdy_skins.Skins(tk)  # costumes drawn in a pixel art editor, if any
         self.hist = self.load_history()      # [(time, {limit: (percent, resets_at)})] for the pace
         self._fresh = False                  # new usage arrived (set by the fetch thread)
@@ -766,11 +764,11 @@ class Widget:
         cw, h = round(CW * k), round(H * k)
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         cfg = cs.load_config()
-        if self.pet:
+        if self.pet:                                   # on the floor; left or right per the corner setting
             mon, y = self.pet_floor()
             x = cfg.get("pet_x")
             if x is None or not (mon[0] <= x <= mon[2] - cw):
-                x = mon[2] - cw - round(120 * k)
+                x = mon[0] + round(120 * k) if "l" in cfg.get("corner", "tr") else mon[2] - cw - round(120 * k)
             return int(x), y
         pos = cfg.get("pos")
         if pos and 0 <= pos[0] <= sw - cw and 0 <= pos[1] <= sh - h:
@@ -799,51 +797,6 @@ class Widget:
         if self.tray:
             self.tray.refresh()
 
-    def pet_tool(self, key):
-        """The buttons above a hovered pet: park at a side, toggle roaming, resize."""
-        k = self.k
-        cw = round(CW * k)
-        mon = self.pet_floor()[0]
-        if key in ("left", "right"):
-            x = mon[0] + round(8 * k) if key == "left" else mon[2] - cw - round(8 * k)
-            self.pet_roaming = False
-            cs.update_config(pet_x=x, pet_roam=False)
-            self.root.geometry("+%d+%d" % (x, self.root.winfo_y()))
-        elif key == "roam":
-            self.pet_roaming = not self.pet_roaming
-            cs.update_config(pet_roam=self.pet_roaming)
-        elif key in ("smaller", "bigger"):
-            sizes = [s for s, _ in SIZES]
-            i = min(range(len(sizes)), key=lambda j: abs(sizes[j] - self.scale)) + (1 if key == "bigger" else -1)
-            if 0 <= i < len(sizes):
-                self.set_scale(sizes[i])
-                self.root.geometry("+%d+%d" % (self.root.winfo_x(), self.pet_floor()[1]))
-
-    def draw_pet_tools(self, top_y):
-        """Five round buttons above the pet while it's hovered: ◀ ↔ − + ▶."""
-        hovered = self.mouse is not None or time.time() - self.left_at < 0.6
-        self._pet_hover += ((1.0 if hovered else 0.0) - self._pet_hover) * 0.25
-        a = ease(clamp(self._pet_hover))
-        self.pet_tools = []
-        if a < 0.05:
-            return
-        y = max(9, top_y - 15)
-        keys = (("left", "◀"), ("roam", "↔"), ("smaller", "−"), ("bigger", "+"), ("right", "▶"))
-        for i, (key, glyph) in enumerate(keys):
-            x = CW / 2 + (i - 2) * 20
-            near = self.mouse is not None and math.hypot(self.mouse[0] - x, self.mouse[1] - y) < 10
-            on = key == "roam" and self.pet_roaming
-            fill = ORANGE if (near or on) else (0.20, 0.18, 0.17)
-            self.oval(x, y, 7.5, 7.5, hx(fill, a))
-            self.text(x, y + 0.5, glyph, hx((0.12, 0.09, 0.08) if (near or on) else TXT, a), 7, bold=True, anchor="center")
-            self.pet_tools.append((key, x, y))
-
-    def on_pet_tool(self, mx, my):
-        for key, x, y in self.pet_tools:
-            if math.hypot(mx - x, my - y) < 10:
-                return key
-        return None
-
     def pet_shape(self):
         """Linux: clip the window to what was drawn, so the desktop shows through."""
         if self.keyed or not sys.platform.startswith("linux"):
@@ -851,19 +804,30 @@ class Widget:
         try:
             if self.pet_shaper is None:
                 self.pet_shaper = Shaper(self.root)
-            rects = []
-            for item in self.canvas.find_withtag("dyn"):
-                b = self.canvas.bbox(item)
-                if b and b[2] > b[0] and b[3] > b[1]:
-                    rects.append((b[0] - 1, b[1] - 1, b[2] - b[0] + 2, b[3] - b[1] + 2))
-            self.pet_shaper.set(rects or [(0, 0, 1, 1)])
-        except Exception:
+            c, rects = self.canvas, []
+            for item in c.find_withtag("dyn"):
+                if c.type(item) == "rectangle":           # exact: the sprite and its parts
+                    x0, y0, x1, y1 = c.coords(item)
+                    x0, y0, x1, y1 = round(x0), round(y0), round(x1), round(y1)
+                    if x1 > x0 and y1 > y0:
+                        rects.append((x0, y0, x1 - x0, y1 - y0))
+                else:                                     # particles, props, text: their box
+                    b = c.bbox(item)
+                    if b and b[2] > b[0] and b[3] > b[1]:
+                        rects.append((b[0], b[1], b[2] - b[0], b[3] - b[1]))
+            rects = rects or [(0, 0, 1, 1)]
+            if rects != getattr(self, "_pet_rects", None):
+                self._pet_rects = rects
+                c.update_idletasks()                      # paint first, then reveal: no flash of background
+                self.pet_shaper.set(rects)
+        except Exception as e:
+            self.log("pet shape", e)
             self.pet_shaper = None
 
     def pet_roam(self, dt):
         """Pets wander along the bottom edge while they walk; the desktop walks are theirs already."""
-        if not self.pet_roaming or self.cur_act not in ("walk", "run", "zombie") or self._drag \
-                or self.col_in or self.panel_in or self.popup_menu or self.e > 0:
+        if not self.v_walks.get() or self.v_lock.get() or self.cur_act not in ("walk", "run", "zombie") \
+                or self._drag or self.col_in or self.panel_in or self.popup_menu or self.e > 0:
             return
         k = self.k
         cw = round(CW * k)
@@ -878,7 +842,7 @@ class Widget:
         self.root.geometry("+%d+%d" % (round(x), self.root.winfo_y()))
 
     def set_corner(self, corner):
-        cs.update_config(corner=corner, pos=None)
+        cs.update_config(corner=corner, pos=None, pet_x=None)
         self.root.geometry("+%d+%d" % self.home_xy())
 
     # ------------------------------------------------ updates
@@ -1038,7 +1002,10 @@ class Widget:
         self.root.geometry("%dx%d+%d+%d" % (cw, h, right - cw, self.root.winfo_y()))
         self.panel.geometry("%dx%d" % (pw, h))
         self.root.update_idletasks()
-        self.round_corners(self.root, cw, h)
+        if self.pet:
+            self.root.geometry("+%d+%d" % (self.root.winfo_x(), self.pet_floor()[1]))   # feet back on the floor
+        else:
+            self.round_corners(self.root, cw, h)
         self.round_corners(self.panel, pw, h)
         self._skey = self._pkey = self._ring_key = self._ppos = None
 
@@ -1113,12 +1080,6 @@ class Widget:
             else:
                 self.setup_claude_code()
             return
-        if self.pet:
-            key = self.on_pet_tool(ev.x / self.k, ev.y / self.k)
-            if key:
-                self._drag, self._press = False, None
-                self.pet_tool(key)
-                return
         if self.on_plus(ev.x / self.k, ev.y / self.k) and not self.pet:
             self._drag = False
             self.new_chat()
@@ -2856,7 +2817,6 @@ class Widget:
             top = max((p for _, p, _ in rows), default=0)
             PET_K = 0.95
             self.draw_scene(top, PET_K, CW / 2, H - 8 - 27 * PET_K)
-            self.draw_pet_tools(H - 8 - (27 - min(self.hat_top(), -27)) * PET_K)
             if time.time() < self.alarm_until or time.time() < self.note_until:
                 text = self.alarm_text if time.time() < self.alarm_until else self.note_text
                 col = (0.95, 0.40, 0.35) if time.time() < self.alarm_until else self.note_color
