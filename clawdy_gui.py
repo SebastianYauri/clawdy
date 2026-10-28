@@ -644,7 +644,6 @@ class Widget:
         self.note_until, self.note_text, self.note_color = 0.0, "", ORANGE
         self.held = False                    # being carried around with the mouse
         self.pet = bool(cs.load_config().get("pet", False))   # pet mode: no card, Clawdy roams the bottom edge
-        globals()["NO_BLEND"] = self.pet
         self.v_pet = tk.BooleanVar(value=self.pet)
         self.pet_shaper, self.cur_act, self._pet_mon = None, None, None
         self.part_fx = {}                    # per-slot (dx, dy, rot) wobble for the current frame
@@ -786,7 +785,6 @@ class Widget:
     def toggle_pet(self):
         """Switch between the card and a free-roaming pet."""
         self.pet = self.v_pet.get()
-        globals()["NO_BLEND"] = self.pet
         cs.update_config(pet=self.pet)
         k = self.k
         cw, h = round(CW * k), round(H * k)
@@ -2852,7 +2850,11 @@ class Widget:
             mark = self.canvas.create_line(0, 0, 0, 0)
             top = max((p for _, p, _ in rows), default=0)
             PET_K = 0.95
-            self.draw_scene(top, PET_K, CW / 2, H - 8 - 27 * PET_K)
+            globals()["NO_BLEND"] = True          # only while drawing the pet: menus and panels keep blending
+            try:
+                self.draw_scene(top, PET_K, CW / 2, H - 8 - 27 * PET_K)
+            finally:
+                globals()["NO_BLEND"] = False
             if time.time() < self.alarm_until or time.time() < self.note_until:
                 text = self.alarm_text if time.time() < self.alarm_until else self.note_text
                 col = (0.95, 0.40, 0.35) if time.time() < self.alarm_until else self.note_color
