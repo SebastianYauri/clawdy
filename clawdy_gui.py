@@ -816,9 +816,13 @@ class Widget:
                     if b and b[2] > b[0] and b[3] > b[1]:
                         rects.append((b[0], b[1], b[2] - b[0], b[3] - b[1]))
             rects = rects or [(0, 0, 1, 1)]
-            if rects != getattr(self, "_pet_rects", None):
+            prev = getattr(self, "_pet_rects", None)
+            if rects != prev:
                 self._pet_rects = rects
-                c.update_idletasks()                      # paint first, then reveal: no flash of background
+                # reveal old+new, paint everything, then trim to the new shape: whatever just
+                # appeared was painted before it became visible, so the background never shows
+                self.pet_shaper.set((prev or []) + rects)
+                c.update_idletasks()
                 self.pet_shaper.set(rects)
         except Exception as e:
             self.log("pet shape", e)
