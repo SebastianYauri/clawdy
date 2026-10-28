@@ -27,6 +27,8 @@ def main(argv):
         return 0
     if "--walk" in argv:
         return 0 if clawdy_system.send_to_running(b"walk") else 1
+    if "--skin" in argv:
+        return 0 if clawdy_system.send_to_running(b"creator") else 1
     if "--uninstall" in argv:
         clawdy_system.uninstall()
         return 0

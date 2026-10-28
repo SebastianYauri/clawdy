@@ -113,7 +113,7 @@ class Creator:
                     cx, cy = PAD + 10 + i * 26 + 60, y + 6
                     r = 8 if key == ch["color"] else 6.5
                     if key == ch["color"]:
-                        c.create_oval(S(cx - 10), S(cy - 10), S(cx + 10), S(cy + 10), outline=hx(self.ORANGE), width=S(1.5))
+                        c.create_oval(S(cx - 10), S(cy - 10), S(cx + 10), S(cy + 10), outline=hx(self.ORANGE), width=max(1, round(S(1.5))))
                     c.create_oval(S(cx - r), S(cy - r), S(cx + r), S(cy + r), fill=hx(rgb), outline="")
                     self.hits.append(((cx - 11, cy - 11, cx + 11, cy + 11), lambda key=key: self.set("color", key)))
             elif kind == "presets":
