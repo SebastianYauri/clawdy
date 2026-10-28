@@ -1412,8 +1412,7 @@ class Widget:
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("action", tr("menu.skin"), lambda: w.root.after(50, w.open_creator)),
             ("action", tr("menu.codexpet"), w.install_codex_pet),
-        ] + ([("action", tr("menu.agy_quota"), w.connect_agy_quota)]
-             if agy.installed() and not agy.mcp_registered() else [])
+        ]
 
     def design_costumes(self):
         """Export a body reference and the current look as PNGs and open the folder to draw over them."""
