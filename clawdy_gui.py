@@ -208,16 +208,25 @@ CODE = ["{", "}", ";", "<>", "/", "=", "()", "[]", "=>"]
 CONFETTI = [(0.95, 0.4, 0.4), (0.4, 0.75, 0.95), (0.95, 0.85, 0.35), (0.5, 0.85, 0.5), (0.85, 0.5, 0.9)]
 
 
+WORKING = ("thinking", "typing", "building", "reading", "sweeping", "groove", "juggling")
+
+
 def read_activity(now):
     """The most relevant state across open Claude Code (and Codex) sessions."""
-    best = None
+    return read_sessions(now)[0]
+
+
+def read_sessions(now):
+    """(best state, [(session id, state, ts)]) across open Claude Code and Codex sessions."""
+    best, active = None, []
     try:
         names = os.listdir(SESSIONS)
     except OSError:
         names = []
-    for s in codex.sessions(now).values():
+    for sid, s in codex.sessions(now).items():
         state = s.get("state")
         if state and state != "idle" and now - s.get("ts", 0) <= TTL.get(state, 300) and state in PRIO:
+            active.append((sid, state, s.get("ts", 0)))
             if best is None or PRIO[state] > PRIO[best]:
                 best = state
     for name in names:
@@ -240,9 +249,10 @@ def read_activity(now):
         subs = s.get("subagents", 0)
         if subs and state in ("thinking", "typing", "building", "reading"):
             state = "juggling" if subs >= 2 else "groove"
+        active.append((name[:-5], state, ts))
         if best is None or PRIO[state] > PRIO[best]:
             best = state
-    return best
+    return best, active
 
 
 # ---------------------------------------------------------------- usage
@@ -648,6 +658,7 @@ class Widget:
         self.pet_shaper, self.cur_act, self._pet_mon = None, None, None
         self.part_fx = {}                    # per-slot (dx, dy, rot) wobble for the current frame
         self.petwin = None                   # Linux: the transparent GTK window that shows the pet
+        self.crew = {}                       # other sessions working at the same time: mini Clawdys
         self.skins = clawdy_skins.Skins(tk)  # costumes drawn in a pixel art editor, if any
         self.hist = self.load_history()      # [(time, {limit: (percent, resets_at)})] for the pace
         self._fresh = False                  # new usage arrived (set by the fetch thread)
@@ -1902,7 +1913,8 @@ class Widget:
             self.work = DEMO_STATES[int(t / 3.0) % len(DEMO_STATES)]
         elif now - self._act_read > 0.25:
             self._act_read = now
-            self.work = read_activity(now)
+            self.work, active = read_sessions(now)
+            self.update_crew(active, now)
         work = self.work
         if work != self._work_prev:
             self._work_prev, self._work_t = work, 0.0
@@ -2426,8 +2438,73 @@ class Widget:
             self.draw_sprite(xf, arm_l, arm_r, eye, eye_dx, eye_dy, step, tuck)
             self.draw_costume(xf, costume, "front", t, glow, eye, eye_dx)
         self.draw_props(props, bx, by, by + dy - SH, t, arm_r)
+        self.draw_crew(cx, by, t)
         self._center = (bx, by + dy - SH / 2)
         self.draw_parts(dt, t)
+
+    def update_crew(self, active, now):
+        """Sessions working besides the main one get a mini Clawdy each (they pop in and out)."""
+        working = [(sid, st, ts) for sid, st, ts in active if st in WORKING]
+        if len(working) >= 2:
+            working.sort(key=lambda a: (-PRIO[a[1]], -a[2]))
+            others = working[1:]                   # the first one is who the big Clawdy acts out
+        else:
+            others = []
+        seen = set()
+        for sid, st, _ in others:
+            seen.add(sid)
+            e = self.crew.setdefault(sid, {"born": now, "popped": False})
+            e["state"], e["gone"] = st, None
+        for sid, e in list(self.crew.items()):
+            if sid not in seen:
+                if e.get("gone") is None:
+                    e["gone"] = now
+                elif now - e["gone"] > 0.6:
+                    del self.crew[sid]
+
+    def draw_crew(self, cx, by, t):
+        """Mini Clawdys beside the big one, one per other working session, in a little wave."""
+        if not self.crew or self.demo and not self.crew:
+            return
+        now = time.time()
+        slots = [-44, 44, -64, 64] if self.pet else [-44, 44]
+        MS = 0.38
+        shown = list(self.crew.items())
+        for i, (sid, e) in enumerate(shown[:len(slots)]):
+            age = now - e["born"]
+            s = MS * (0.5 + 0.5 * ease(clamp(age / 0.3)) + 0.18 * math.sin(clamp(age / 0.45) * math.pi))   # pops in
+            if e.get("gone") is not None:
+                s *= max(0.0, 1 - (now - e["gone"]) / 0.4)
+            if s < 0.03:
+                continue
+            ph = i * 0.9
+            state = e["state"]
+            x, feet = cx + slots[i], by + 2
+            hop = abs(math.sin(t * 5 + ph)) * (3.5 if state in ("building", "juggling", "groove") else 1.2)
+            arm = -6 + math.sin(t * 12 + ph) * 3 if state == "typing" else (-3 if state == "reading" else 0.0)
+            step = int(t * 6 + ph) % 2 if state in ("building", "sweeping") else None
+            xf = Xform(x, feet - hop - SH / 2 * s, s, s, math.sin(t * 3 + ph) * 0.06)
+            self.draw_costume(xf, None, "back", t, 0.6, "happy", 0)
+            self.draw_sprite(xf, arm, arm, "happy", 0, 0, step, False)
+            self.draw_costume(xf, None, "front", t, 0.6, "happy", 0)
+            top = feet - hop - (27 - min(self.hat_top(), -27) + 27) * s
+            if state == "thinking" and int(t * 2 + ph) % 2:
+                self.text(x, top - 5, "…", hx(TXT), 6, bold=True, anchor="center")
+            if not e["popped"]:                    # arrival: a puff and a ring of sparks
+                e["popped"] = True
+                for j in range(8):
+                    a = j * math.pi / 4
+                    self.spawn("puff", x + math.cos(a) * 8, feet - SH * MS / 2 + math.sin(a) * 6,
+                               math.cos(a) * 45, math.sin(a) * 35, 0.5)
+                    self.spawn("spark", x, feet - SH * MS / 2, math.cos(a) * 70, math.sin(a) * 55 - 20, 0.5)
+            if e.get("gone") is not None and not e.get("waved"):   # leaving: confetti
+                e["waved"] = True
+                for j in range(10):
+                    self.spawn("conf", x, feet - SH * MS / 2, random.uniform(-60, 60), random.uniform(-90, -30), 0.9,
+                               col=random.choice(CONFETTI), spin=random.uniform(0, 6))
+        extra = len(shown) - len(slots)
+        if extra > 0:
+            self.text(cx + slots[-1], by - SH * MS - 16, "+%d" % extra, hx(ORANGE), 6, bold=True, anchor="center")
 
     def draw_intro(self, cx, by, it, dt, t):
         """Clawdy walks in with a ball, throws it on the floor and the rings fill up.

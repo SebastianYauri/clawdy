@@ -5,6 +5,12 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.4
 
+- **A crew for parallel sessions.** When several Claude Code or Codex sessions
+  work at the same time, each extra one gets a mini Clawdy beside the big one
+  (dressed the same), acting out its own state: tapping away, hopping on
+  commands, "…" while thinking. They pop in with a puff of smoke and sparks,
+  and leave with confetti when their session finishes. Two fit in the rings,
+  four in pet mode; more show as "+N".
 - **Pet mode.** **Settings… → Pet mode**: no card, no rings; Clawdy stands on
   the bottom edge of the screen (above the taskbar or Dock), wanders left and
   right while it walks, keeps acting out what Claude or Codex is doing, and
