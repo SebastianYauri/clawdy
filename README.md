@@ -10,7 +10,8 @@
 </p>
 
 **Clawdy** is a tiny desktop buddy that sits in a corner of your screen and
-shows **how much of your Claude plan you've used**. While Claude Code works,
+shows **how much of your Claude plan you've used** (or your ChatGPT plan's
+Codex limits, if you use the Codex CLI). While Claude Code works,
 Clawdy acts it out: it thinks, types on its laptop, hammers away at commands,
 juggles subagents… and throws confetti when the job is done.
 
@@ -95,6 +96,11 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
 - **One click to a new chat.** The **+** button opens a new chat in the Claude
   desktop app, or on claude.ai if the app isn't installed.
 - **Updates itself.** Checks GitHub Releases at start-up and every 6 hours.
+- **Works with Codex too.** Use OpenAI's Codex CLI instead of (or besides)
+  Claude Code? Clawdy reads Codex's 5-hour and weekly limits and what it's
+  doing straight from the session files Codex already writes: no setup, no key.
+  It picks Codex by itself when Claude Code isn't installed, or choose
+  **Settings… → Usage from**.
 - **Free and private.** No API key, no extra cost, no servers, no telemetry.
 - **English and Spanish**, following your system language.
 

@@ -5,6 +5,12 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.4
 
+- **Codex support.** Clawdy now works with OpenAI's Codex CLI: it reads your
+  ChatGPT plan's 5-hour and weekly limits and what Codex is doing from the
+  session files Codex writes (`~/.codex/sessions`), with no setup, network or
+  key. Animations, pace, alerts and "Codex finished" notifications all work.
+  It's chosen automatically when Claude Code isn't installed, or pick it in
+  **Settings… → Usage from** (Auto · Claude · Codex).
 - **Redrawn costumes.** The witch, Santa, Frankenstein and vampire costumes are
   now pixel art drawn at twice Clawdy's resolution, with outlines, shading and
   highlights (the vampire's cape has a high collar and a crimson lining).

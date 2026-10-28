@@ -20,6 +20,7 @@ from clawdy_system import SESSIONS
 from clawdy_tray import Tray
 from clawdy_walk import Walk
 import clawdy_sessions as sessions
+import clawdy_codex as codex
 import clawdy_share
 import clawdy_skins
 from clawdy_version import VERSION
@@ -205,12 +206,17 @@ CONFETTI = [(0.95, 0.4, 0.4), (0.4, 0.75, 0.95), (0.95, 0.85, 0.35), (0.5, 0.85,
 
 
 def read_activity(now):
-    """The most relevant state across open Claude Code sessions."""
+    """The most relevant state across open Claude Code (and Codex) sessions."""
     best = None
     try:
         names = os.listdir(SESSIONS)
     except OSError:
-        return None
+        names = []
+    for s in codex.sessions(now).values():
+        state = s.get("state")
+        if state and state != "idle" and now - s.get("ts", 0) <= TTL.get(state, 300) and state in PRIO:
+            if best is None or PRIO[state] > PRIO[best]:
+                best = state
     for name in names:
         if not name.endswith(".json"):
             continue
@@ -272,8 +278,30 @@ class State:
         return self.data is not None and time.time() - self.updated < POLL
 
 
+def source():
+    """Where usage comes from: "claude" or "codex" (OpenAI Codex CLI)."""
+    pref = cs.load_config().get("source", "auto")
+    if pref in ("claude", "codex"):
+        return pref
+    return "codex" if codex.installed() and not cs.logged_in() else "claude"
+
+
+def fetch_codex(st):
+    """Codex writes its limits into its own session files: read them, no request needed."""
+    data = codex.usage()
+    st.need, st.retry_at = None, 0
+    if not data:
+        st.error = tr("error.codex_none")
+        return "error"
+    st.data, st.error, st.updated = data, None, time.time()
+    st.save()
+    return "ok"
+
+
 def fetch(st):
     """One usage request. Returns "ok", "expired", "rate", "auth", "offline", "error" or "skip"."""
+    if source() == "codex":
+        return fetch_codex(st)
     if time.time() < st.retry_at or st.fresh():
         return "skip"
     try:
@@ -1076,6 +1104,8 @@ class Widget:
             ("toggle", tr("menu.tasks"), w.v_tasks, w.toggle_tasks),
             ("toggle", tr("menu.sounds"), w.v_sounds, w.toggle_sounds),
             ("sep",),
+            ("pills", tr("menu.source"), [("auto", tr("costume.auto")), ("claude", "Claude"), ("codex", "Codex")],
+             lambda: cs.load_config().get("source", "auto"), w.set_source, 3),
             ("pills", tr("menu.done_after"), list(DONE_AFTER), lambda: w.done_after, w.set_done_after, 4),
             ("pills", tr("menu.size"), [(v, tr(l)) for v, l in SIZES], lambda: w.scale, w.set_scale, 3),
             ("pills", tr("menu.costume"), [(c, tr("costume." + c)) for c in PopupMenu.COSTUMES],
@@ -1152,7 +1182,7 @@ class Widget:
         elif outcome == "skip":                 # still fresh, or still rate limited
             self._next_fetch = max(self.st.retry_at, self.st.updated + POLL)
         else:
-            self._next_fetch = now + POLL
+            self._next_fetch = now + (20 if source() == "codex" else POLL)   # Codex: just a local file
 
     def setup_claude_code(self, ask=True):
         """Install Claude Code if needed and sign in, without any terminal: the only
@@ -1334,7 +1364,8 @@ class Widget:
 
         def work():
             try:
-                path = clawdy_share.save_card(clawdy_share.make_card(rows, tr("share.title"), tr("share.footer", link=clawdy_share.LINK)))
+                title = tr("share.title_codex" if (self.st.data or {}).get("source") == "codex" else "share.title")
+                path = clawdy_share.save_card(clawdy_share.make_card(rows, title, tr("share.footer", link=clawdy_share.LINK)))
             except Exception as e:
                 self.root.after(0, lambda: self.flash(tr("share.failed", e=str(e)[:40])))
                 return
@@ -1347,6 +1378,14 @@ class Widget:
 
     def toggle_tasks(self):
         cs.update_config(tasks=self.v_tasks.get())
+
+    def set_source(self, value):
+        """Claude or Codex: forget the other one's numbers and read again now."""
+        cs.update_config(source=value)
+        self.st.data, self.st.updated, self.st.retry_at, self.st.error = None, 0.0, 0.0, None
+        self.hist, self._renew = [], {}
+        self._next_fetch = 0.0
+        self.refresh()
 
     def set_done_after(self, secs):
         self.done_after = secs
@@ -1366,23 +1405,25 @@ class Widget:
                     found[name[:-5]] = json.load(open(os.path.join(SESSIONS, name)))
                 except Exception:
                     pass
+        found.update(codex.sessions())
         first, prev = self._marks is None, self._marks or {}
         self._marks = {sid: (s.get("done", 0), s.get("ask", 0)) for sid, s in found.items()}
         if first or self.demo or not self.v_tasks.get():
             return                              # at start-up, only remember what was already there
         for sid, s in found.items():
             done0, ask0 = prev.get(sid, (0, 0))
-            where = os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else "Claude Code"
+            who = "Codex" if sid.startswith("codex-") else "Claude"
+            where = os.path.basename(os.path.normpath(s["cwd"])) if s.get("cwd") else who
             ask, done = s.get("ask", 0), s.get("done", 0)
             # only a permission prompt stops a task halfway; "waiting for your reply"
             # comes after it already finished, which the "done" notice covers
             if (ask > ask0 and ask > done and s.get("ask_kind") == "permission"
                     and ask - self._asked.get(sid, 0) > ASK_GAP):
                 self._asked[sid] = ask
-                self.announce(tr("task.ask_title"), tr("task.permission", where=where), "ask",
+                self.announce(tr("task.ask_title", who=who), tr("task.permission", where=where), "ask",
                               tr("task.ask_short"), ORANGE)
             elif done > done0 and s.get("took", 0) >= self.done_after:
-                self.announce(tr("task.done_title"), tr("task.done_body", where=where, t=duration(s["took"])),
+                self.announce(tr("task.done_title", who=who), tr("task.done_body", where=where, t=duration(s["took"])),
                               "done", tr("task.done_short"), (0.45, 0.78, 0.45))
 
     def announce(self, title, body, sound, short, color):
@@ -2764,7 +2805,8 @@ class Widget:
     def draw_panel(self, px, rows, a):
         st = self.st
         x0, x1 = px + 11, px + PW - 11
-        self.text(x0, 9, tr("panel.title"), hx(DIM, a), 5, bold=True)
+        title = "panel.title_codex" if (st.data or {}).get("source") == "codex" else "panel.title"
+        self.text(x0, 9, tr(title), hx(DIM, a), 5, bold=True)
         if not rows:
             self.text(px + PW / 2, H / 2, self.status_msg(), hx(DIM, a), 7, anchor="center")
         shown = rows[:4]
@@ -3218,7 +3260,7 @@ class Welcome:
         ttk.Label(body, wraplength=round(370 * k), justify="left",
                   text=tr("welcome.intro")
                   ).pack(anchor="w", pady=(6, 12))
-        if not cs.logged_in():
+        if not cs.logged_in() and not codex.installed():
             ttk.Label(body, wraplength=round(370 * k), justify="left", foreground="#b5482a",
                       text=tr("welcome.no_login")).pack(anchor="w", pady=(0, 12))
 
