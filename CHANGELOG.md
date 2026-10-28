@@ -36,12 +36,12 @@ All notable changes to Clawdy are listed here. Versions follow
   Gemini CLI, is a third source: Clawdy installs its hooks alongside Claude
   Code's, reacts to its tools and model calls, counts its sessions in the crew,
   notifies "Gemini finished", lists and resumes its conversations and opens
-  `agy` from **+**. Quota: Antigravity shares it only with its own child
-  processes, so **Settings… → Show Gemini quota** registers Clawdy in `agy` as
-  a no-tools MCP server (`clawdy --agy-mcp`) that reads the quota summary once
-  a minute while `agy` runs; the desktop app's language server is read
-  directly; and an exhausted quota in the CLI log still shows as a full bar.
-  Pick the source in **Usage from** or on first run.
+  `agy` from **+**. Quota: the desktop app's language server is read directly
+  (per model pool and window); the CLI shares its quota with nothing (hooks and
+  MCP servers get no token), so with the CLI alone an exhausted quota in its
+  log shows as a full bar. `clawdy --agy-mcp` stays as a no-tools MCP server
+  ready for the day the CLI hands out its token. Pick the source in **Usage
+  from** or on first run.
 - **Codex support.** Clawdy now works with OpenAI's Codex CLI: it reads your
   ChatGPT plan's 5-hour and weekly limits and what Codex is doing from the
   session files Codex writes (`~/.codex/sessions`), with no setup, network or
