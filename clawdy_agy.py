@@ -316,7 +316,7 @@ def handle(ev, data):
     ws = data.get("workspacePaths") or []
     if ws:
         s["cwd"] = str(ws[0])[:400]
-    s["pid"] = os.getppid()
+    s.update(cs.session_anchor())
     tmp = "%s.%d.tmp" % (path, os.getpid())
     with open(tmp, "w") as f:
         json.dump(s, f)

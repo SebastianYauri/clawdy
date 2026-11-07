@@ -8,7 +8,9 @@ import os
 import sys
 import time
 
-from clawdy_system import SESSIONS
+import clawdy_system as cs
+
+SESSIONS = cs.SESSIONS
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 READ_TOOLS = {"Read", "Grep", "Glob", "WebFetch", "WebSearch", "LS"}
@@ -103,7 +105,7 @@ def handle(data):
     s["ts"] = now
     if data.get("cwd"):
         s["cwd"] = str(data["cwd"])[:400]       # shown in the sessions list
-    s["pid"] = os.getppid()                     # Claude Code (or its shell): to find its window
+    s.update(cs.session_anchor())               # Claude Code's pid, tty and terminal: to find its window
 
     tmp = "%s.%d.tmp" % (path, os.getpid())
     with open(tmp, "w") as f:

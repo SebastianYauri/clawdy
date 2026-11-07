@@ -172,6 +172,7 @@ STRINGS = {
     "sessions.new": ("New chat in…", "Nuevo chat en…"),
     "sessions.none": ("No Claude Code chats yet", "Aún no hay chats de Claude Code"),
     "sessions.cant_focus": ("can't switch windows here", "no puedo cambiar de ventana aquí"),
+    "sessions.notice": ("click the \"is ready\" notice at the top", "pulsa el aviso «está preparado» de arriba"),
     "sessions.yesterday": ("yesterday", "ayer"),
     "menu.size": ("Size", "Tamaño"),
     "menu.costume": ("Costume", "Disfraz"),

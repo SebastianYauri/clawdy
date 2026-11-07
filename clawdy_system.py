@@ -573,55 +573,202 @@ def _ancestors(pid):
     return chain, parents
 
 
-def focus_session(pid):
-    """Bring the window that hosts this Claude Code session to the front. Returns True
-    when it worked (Windows, macOS, Linux on X11; not possible on Wayland)."""
+SHELLS = {"sh", "bash", "zsh", "fish", "dash", "ksh", "cmd.exe", "powershell.exe", "pwsh.exe", "conhost.exe"}
+TERM_VARS = ("TERM_PROGRAM", "TMUX_PANE", "KITTY_WINDOW_ID", "WEZTERM_PANE", "WT_SESSION", "ITERM_SESSION_ID",
+             "TERM_SESSION_ID", "GNOME_TERMINAL_SCREEN", "PTYXIS_VERSION", "KONSOLE_DBUS_SESSION", "WINDOWID")
+
+
+def _proc_names(chain, parents):
+    """{pid: process name} for a chain of pids."""
+    if WIN:
+        return {p: parents.get(p, (0, ""))[1] for p in chain}
+    names = {}
+    if MAC:
+        try:
+            out = subprocess.run(["ps", "-o", "pid=,comm=", "-p", ",".join(str(p) for p in chain)],
+                                 capture_output=True, text=True, timeout=2).stdout
+            for line in out.splitlines():
+                pid, _, comm = line.strip().partition(" ")
+                names[int(pid)] = os.path.basename(comm.strip()).lower()
+        except Exception:
+            pass
+        return names
+    for p in chain:
+        try:
+            with open("/proc/%d/comm" % p) as f:
+                names[p] = f.read().strip().lower()
+        except OSError:
+            pass
+    return names
+
+
+def session_anchor():
+    """From inside a hook: what finding this session's window later takes. The hook's parent
+    is only a shell that exits at once, so the pid kept is Claude Code's own; with it its
+    tty and the terminal's markers from the environment (ids and names, never secrets)."""
+    out = {"pid": os.getppid()}
     try:
-        chain, parents = _ancestors(pid)
+        chain, parents = _ancestors(os.getppid())
+        names = _proc_names(chain, parents)
+        for p in chain:
+            if names.get(p, "") not in SHELLS:
+                out["pid"] = p
+                break
+    except Exception:
+        pass
+    try:
+        if MAC:
+            tty = subprocess.run(["ps", "-o", "tty=", "-p", str(out["pid"])], capture_output=True,
+                                 text=True, timeout=2).stdout.strip()
+            if tty and tty != "??":
+                out["tty"] = "/dev/" + tty
+        elif not WIN:
+            out["tty"] = os.readlink("/proc/%d/fd/0" % out["pid"])
+    except Exception:
+        pass
+    term = {k: os.environ[k][:80] for k in TERM_VARS if os.environ.get(k)}
+    if term:
+        out["term"] = term
+    return out
+
+
+def focus_session(session):
+    """Bring the window, and the tab where the terminal lets us, that hosts this Claude Code
+    session to the front. True when it was raised, "notice" when the desktop only offers the
+    user a way there (GNOME's "is ready" notification), False when nothing could be done."""
+    pid, tty, term = session.get("pid"), session.get("tty") or "", session.get("term") or {}
+    try:
+        if term.get("TMUX_PANE") and shutil.which("tmux"):               # the right pane, inside tmux
+            subprocess.run(["tmux", "select-window", "-t", term["TMUX_PANE"]], capture_output=True, timeout=2)
+            subprocess.run(["tmux", "select-pane", "-t", term["TMUX_PANE"]], capture_output=True, timeout=2)
+        if term.get("WEZTERM_PANE") and shutil.which("wezterm"):
+            if subprocess.run(["wezterm", "cli", "activate-pane", "--pane-id", term["WEZTERM_PANE"]],
+                              capture_output=True, timeout=3).returncode == 0:
+                return True
+        if term.get("KITTY_WINDOW_ID") and shutil.which("kitten"):
+            if subprocess.run(["kitten", "@", "focus-window", "--match", "id:" + term["KITTY_WINDOW_ID"]],
+                              capture_output=True, timeout=3).returncode == 0:
+                return True
+    except Exception:
+        pass
+    try:
+        if WIN:
+            return _focus_windows(pid)
+        if MAC:
+            return _focus_mac(pid, tty, term)
+        return _focus_linux(pid, tty, term)
     except Exception:
         return False
-    if WIN:
-        import ctypes
-        from ctypes import wintypes
-        user32 = ctypes.windll.user32
-        skip = {"explorer.exe", "svchost.exe", "services.exe", "wininit.exe"}
-        ok_pids = [p for p in chain if parents.get(p, (0, ""))[1] not in skip]
-        found = {}
 
-        def visit(hwnd, _):
-            if user32.IsWindowVisible(hwnd) and user32.GetWindowTextLengthW(hwnd) > 0:
-                owner = wintypes.DWORD()
-                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
-                if owner.value in ok_pids and owner.value not in found:
-                    found[owner.value] = hwnd
-            return True
-        user32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(visit), 0)
-        for p in ok_pids:                                     # closest ancestor first
-            if p in found:
-                user32.ShowWindow(found[p], 9)                # SW_RESTORE
-                return bool(user32.SetForegroundWindow(found[p]))
-        return False
-    if MAC:
-        for p in chain:
-            try:
-                path = subprocess.run(["ps", "-o", "comm=", "-p", str(p)], capture_output=True,
-                                      text=True, timeout=2).stdout.strip()
-            except Exception:
-                continue
-            if ".app/" in path:
-                subprocess.Popen(["open", "-a", path.split(".app/")[0] + ".app"])
+
+def _focus_windows(pid):
+    import ctypes
+    from ctypes import wintypes
+    chain, parents = _ancestors(pid)
+    user32 = ctypes.windll.user32
+    skip = {"explorer.exe", "svchost.exe", "services.exe", "wininit.exe"}
+    ok_pids = [p for p in chain if parents.get(p, (0, ""))[1] not in skip]
+    found = {}
+
+    def visit(hwnd, _):
+        if user32.IsWindowVisible(hwnd) and user32.GetWindowTextLengthW(hwnd) > 0:
+            owner = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+            if owner.value in ok_pids and owner.value not in found:
+                found[owner.value] = hwnd
+        return True
+    user32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(visit), 0)
+    for p in ok_pids:                                     # closest ancestor first
+        if p in found:
+            user32.ShowWindow(found[p], 9)                # SW_RESTORE
+            return bool(user32.SetForegroundWindow(found[p]))
+    return False
+
+
+_TAB_SCRIPTS = {
+    "Apple_Terminal": '''tell application "Terminal"
+  repeat with w in windows
+    repeat with t in tabs of w
+      if tty of t is "%s" then
+        set selected tab of w to t
+        set index of w to 1
+        activate
+        return "yes"
+      end if
+    end repeat
+  end repeat
+end tell
+return "no"''',
+    "iTerm.app": '''tell application "iTerm2"
+  repeat with w in windows
+    repeat with t in tabs of w
+      repeat with s in sessions of t
+        if tty of s is "%s" then
+          select s
+          select t
+          activate
+          return "yes"
+        end if
+      end repeat
+    end repeat
+  end repeat
+end tell
+return "no"''',
+}
+
+
+def _focus_mac(pid, tty, term):
+    script = _TAB_SCRIPTS.get(term.get("TERM_PROGRAM", ""))
+    if script and tty:                                    # Terminal and iTerm2 can pick the tab by tty
+        try:
+            r = subprocess.run(["osascript", "-e", script % tty], capture_output=True, text=True, timeout=6)
+            if "yes" in r.stdout:
                 return True
-        return False
-    if os.environ.get("WAYLAND_DISPLAY") and not shutil.which("xdotool"):
-        return False
-    if shutil.which("xdotool"):
+        except Exception:
+            pass
+    chain, _ = _ancestors(pid)
+    for p in chain:                                       # else the app that owns the process
+        try:
+            path = subprocess.run(["ps", "-o", "comm=", "-p", str(p)], capture_output=True,
+                                  text=True, timeout=2).stdout.strip()
+        except Exception:
+            continue
+        if ".app/" in path:
+            subprocess.Popen(["open", "-a", path.split(".app/")[0] + ".app"])
+            return True
+    return False
+
+
+def _focus_linux(pid, tty, term):
+    if shutil.which("xdotool") and (not os.environ.get("WAYLAND_DISPLAY") or term.get("WINDOWID")):
+        chain, _ = _ancestors(pid)
         for p in chain:
             out = subprocess.run(["xdotool", "search", "--pid", str(p)], capture_output=True,
                                  text=True, timeout=2).stdout.split()
             if out:
                 return subprocess.run(["xdotool", "windowactivate", out[-1]],
                                       capture_output=True, timeout=2).returncode == 0
+    if term.get("PTYXIS_VERSION") and shutil.which("gdbus"):
+        # Wayland: no app may raise another's window. Asked over D-Bus, Ptyxis presents its own
+        # (it doesn't open a new one) and GNOME, refusing the focus, shows its "is ready" notice:
+        # one click away. The tab can't be chosen from outside: a bell on the session's tty
+        # marks it so it stands out.
+        subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Ptyxis", "--object-path",
+                        "/org/gnome/Ptyxis", "--method", "org.freedesktop.Application.Activate", "{}"],
+                       capture_output=True, timeout=3)
+        _ring(tty)
+        return "notice"
+    if tty and os.environ.get("WAYLAND_DISPLAY"):
+        _ring(tty)
     return False
+
+
+def _ring(tty):
+    try:
+        with open(tty, "w") as f:
+            f.write("\a")
+    except OSError:
+        pass
 
 
 def play_sound(name):

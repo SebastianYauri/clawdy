@@ -5,6 +5,18 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.4
 
+- **Back to the chat you already have open.** In the chats tree, sessions whose
+  Claude Code is still running are listed under *Open now*, and clicking one
+  brings its terminal to the front instead of starting a second copy: the very
+  tab in tmux, kitty, WezTerm, Terminal.app and iTerm2; the window on Windows
+  and X11; on GNOME Wayland (Ptyxis) GNOME only allows its "is ready" notice,
+  one click away, and the tab gets marked.
+  The hook now records Claude Code's own pid (its shell exits at once), its
+  tty and the terminal's markers, so open sessions are detected reliably.
+- **The panel stays on screen.** It picks the side to slide out on from the
+  monitor Clawdy is on (not the whole desktop), flips sides when it wouldn't
+  fit, and keeps itself inside that monitor even when Clawdy hangs off an edge.
+  It also folds away while you carry Clawdy around.
 - **A crew for parallel sessions.** When several Claude Code or Codex sessions
   work at the same time, each extra one gets a mini Clawdy beside the big one
   (dressed the same), acting out its own state: tapping away, hopping on

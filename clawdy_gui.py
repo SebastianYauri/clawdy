@@ -593,10 +593,12 @@ class Widget:
         self.pos, self.dir, self.act_i, self.act_t = 0.0, 1, 0, 0.0
         self.parts, self.landed, self.emit, self.hammer = [], False, 0.0, 0.0
         self.fscale, self.mouse, self._drag = 1.0, None, False
+        self._dropped = 0.0                          # when Clawdy was last put down after a drag
         self.pinned = bool(cs.load_config().get("expanded"))
         self.e = 0.0                                # 0 = compact, 1 = expanded
         self.target, self.in_since, self.out_since = 0, None, None
         self.panel_left = True                      # the panel opens to the left
+        self._mon_cache = None                      # (when, rect) of the monitor Clawdy was last on
         self.col_in = self.panel_in = False
         self.left_at = 0.0
         self._hover_last = time.time()
@@ -1090,8 +1092,45 @@ class Widget:
             except tk.TclError:
                 pass
 
+    def monitor_at(self, x, y):
+        """(x0, top, x1, y1) of the monitor under a point, top below the system bar if any. The
+        last answer is reused while the point stays on that monitor: xrandr is a process."""
+        now = time.time()
+        c = self._mon_cache
+        if c and now - c[0] < 30 and c[1][0] <= x < c[1][2] and c[1][1] <= y < c[1][3]:
+            return c[2]
+        from clawdy_walk import _monitor_windows, _monitor_linux, _monitor_mac
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        try:
+            if cs.WIN:
+                rect, top = _monitor_windows(x, y)[0], None
+            elif cs.MAC:
+                rect, top = _monitor_mac(x, y, sw, sh)
+            else:
+                rect, top = _monitor_linux(x, y, sw, sh)
+        except Exception:
+            rect, top = (0, 0, sw, sh), None
+        usable = (rect[0], top if top is not None else rect[1], rect[2], rect[3])
+        self._mon_cache = (now, tuple(rect), usable)
+        return usable
+
+    def pick_side(self):
+        """Open the panel towards the free side of the monitor Clawdy is on; if it wouldn't fit
+        there, the other side."""
+        k = self.k
+        rx, ry = self.root.winfo_x(), self.root.winfo_y()
+        cw, pw, h, gap = round(CW * k), round(PW * k), round(H * k), round(6 * k)
+        mon = self.monitor_at(rx + cw // 2, ry + h // 2)
+        left = rx + cw / 2 > (mon[0] + mon[2]) / 2
+        if left and rx - pw - gap < mon[0] and rx + cw + gap + pw <= mon[2]:
+            left = False
+        elif not left and rx + cw + gap + pw > mon[2] and rx - pw - gap >= mon[0]:
+            left = True
+        self.panel_left = left
+
     def place_panel(self):
-        """Slide the panel out from behind the column towards the free side."""
+        """Slide the panel out from behind the column towards the free side, kept inside the
+        monitor even when Clawdy itself hangs off an edge."""
         k = self.k
         if self.e <= 0.0:
             if self.panel_out:
@@ -1101,12 +1140,15 @@ class Widget:
                 self._ppos = None
             return
         rx, ry = self.root.winfo_x(), self.root.winfo_y()
-        cw, pw, gap = round(CW * k), round(PW * k), round(6 * k)
+        cw, pw, h, gap = round(CW * k), round(PW * k), round(H * k), round(6 * k)
         if self.panel_left:
             start, end = rx + cw - pw, rx - pw - gap
         else:
             start, end = rx, rx + cw + gap
         x = round(lerp(start, end, ease(self.e)))
+        mon = self.monitor_at(rx + cw // 2, ry + h // 2)
+        if mon[3] - mon[1] >= h:
+            ry = max(mon[1], min(mon[3] - h, ry))
         if not self.panel_out:
             self.panel_out = True
             self.panel.lift()
@@ -1192,13 +1234,16 @@ class Widget:
         # Hovering the + while compact doesn't expand, so the button doesn't run away.
         over_plus = self.e < 0.5 and self.mouse is not None and not self.pet and (self.on_plus(*self.mouse)
                                                                                   or self.on_pin(*self.mouse))
-        hot = inside and not over_plus
+        carried = self.held or now - self._dropped < 0.5     # being moved: the panel stays away
+        hot = inside and not over_plus and not carried
         if hot:
             self.out_since, self.in_since = None, self.in_since or now
         else:
             self.in_since, self.out_since = None, self.out_since or now
 
-        if self.pinned or (inside and self.e >= 0.5):
+        if carried:
+            target = 0
+        elif self.pinned or (inside and self.e >= 0.5):
             target = 1
         elif hot and now - self.in_since >= OPEN_AFTER:
             target = 1
@@ -1207,9 +1252,7 @@ class Widget:
         else:
             target = 0
         if target == 1 and self.target == 0 and self.e == 0.0:
-            # towards the free side of the screen
-            col = self.root.winfo_x() + round(CW * self.k) / 2
-            self.panel_left = col > self.root.winfo_screenwidth() / 2
+            self.pick_side()
         if target != self.target:
             self.log("DECIDE", "open" if target else "close", "inside=%s e=%.2f" % (inside, self.e))
         self.target = target
@@ -1243,6 +1286,7 @@ class Widget:
         self._drag = False
         if self.held:
             self.held = False
+            self._dropped = time.time()
             if self.pet:                         # pets live on the floor: keep the x, drop back down
                 cs.update_config(pet_x=self.root.winfo_x())
                 self.root.geometry("+%d+%d" % (self.root.winfo_x(), self.pet_floor()[1]))
@@ -1296,11 +1340,15 @@ class Widget:
         def focus(s):
             if codex_mode:                   # no window to raise: reopen the thread in a terminal
                 sessions.resume_codex(s)
-            elif not cs.focus_session(s["pid"]):
-                if agy_mode:
-                    agy.resume(s)
-                else:
-                    self.flash(tr("sessions.cant_focus"), 4)
+            else:
+                got = cs.focus_session(s)
+                if got == "notice":
+                    self.flash(tr("sessions.notice"), 5)
+                elif not got:
+                    if agy_mode:
+                        agy.resume(s)
+                    else:
+                        self.flash(tr("sessions.cant_focus"), 4)
 
         resume = sessions.resume_codex if codex_mode else (agy.resume if agy_mode else sessions.resume)
         new_in = sessions.new_codex_in if codex_mode else (agy.new_chat_in if agy_mode else sessions.new_chat_in)
