@@ -54,7 +54,10 @@ Linux)
         SUDO=""
         [ "$(id -u)" = 0 ] || SUDO="sudo"
         say "Installing (your password may be asked)…"
-        $SUDO apt-get install -y "$TMP/clawdy.deb"
+        $SUDO apt-get install -y "$TMP/clawdy.deb" || {
+            say "A dependency was missing from the package index: refreshing it and retrying…"
+            $SUDO apt-get update -qq && $SUDO apt-get install -y "$TMP/clawdy.deb"
+        }
         if [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && [ "$(id -u)" != 0 ]; then
             (setsid clawdy >/dev/null 2>&1 &) || true
         fi
