@@ -26,6 +26,8 @@ for slot in head face body fx; do
 done
 install -d "$PKG/usr/lib/clawdy/assets/codex-pet/clawdy"
 install -m 644 "$ROOT"/assets/codex-pet/clawdy/* "$PKG/usr/lib/clawdy/assets/codex-pet/clawdy/"
+install -d "$PKG/usr/lib/clawdy/assets/gnome/focus@clawdy.app"
+install -m 644 "$ROOT"/assets/gnome/focus@clawdy.app/* "$PKG/usr/lib/clawdy/assets/gnome/focus@clawdy.app/"
 install -m 644 "$ROOT/assets/icon.png" "$PKG/usr/share/icons/hicolor/256x256/apps/clawdy.png"
 install -m 644 "$ROOT/LICENSE" "$PKG/usr/share/doc/clawdy/copyright"
 

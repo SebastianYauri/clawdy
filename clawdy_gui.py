@@ -599,6 +599,7 @@ class Widget:
         self.target, self.in_since, self.out_since = 0, None, None
         self.panel_left = True                      # the panel opens to the left
         self._mon_cache = None                      # (when, rect) of the monitor Clawdy was last on
+        self._screens = None                        # the monitor layout, to notice a screen plugged or unplugged
         self.col_in = self.panel_in = False
         self.left_at = 0.0
         self._hover_last = time.time()
@@ -784,6 +785,7 @@ class Widget:
         self.set_alpha(0.0)
         self.root.geometry("+%d+%d" % self.home_xy())
         self._placed = True
+        self.root.after(5000, self.watch_screens)
 
     def pet_floor(self, x=None):
         """(monitor rect, y of the window) so a pet stands on the bottom edge, above the taskbar/Dock."""
@@ -818,13 +820,53 @@ class Widget:
             if x is None or not (mon[0] <= x <= mon[2] - cw):
                 x = mon[0] + round(120 * k) if "l" in cfg.get("corner", "tr") else mon[2] - cw - round(120 * k)
             return int(x), y
+        from clawdy_walk import monitors, nearest_monitor
+        mons = monitors(sw, sh)
         pos = cfg.get("pos")
-        if pos and 0 <= pos[0] <= sw - cw and 0 <= pos[1] <= sh - h:
+        if pos and self._monitor_of(mons, pos[0] + cw // 2, pos[1] + h // 2):
             return int(pos[0]), int(pos[1])
+        # the chosen corner of the primary monitor (not of the whole desktop: with two screens that
+        # corner can be in the void) or, if Clawdy was left on a screen that is gone, the nearest one
+        cx, cy = (pos[0] + cw // 2, pos[1] + h // 2) if pos else (0, 0)
+        mon = nearest_monitor(mons, cx, cy) if pos else next((r for r, p in mons if p), mons[0][0])
         corner = cfg.get("corner", "tr")
-        x = round(30 * k) if "l" in corner else sw - cw - round(30 * k)
-        y = round(60 * k) if "t" in corner else sh - h - round(60 * k)
+        x = mon[0] + round(30 * k) if "l" in corner else mon[2] - cw - round(30 * k)
+        y = mon[1] + round(60 * k) if "t" in corner else mon[3] - h - round(60 * k)
         return x, y
+
+    @staticmethod
+    def _monitor_of(mons, x, y):
+        """The monitor rect under a point, or None when the point is in the void."""
+        return next((r for r, _ in mons if r[0] <= x < r[2] and r[1] <= y < r[3]), None)
+
+    def watch_screens(self):
+        """Every few seconds: if a screen was plugged in, unplugged or moved, forget what we knew
+        about monitors and make sure Clawdy is still on one; a window left in the void is lost."""
+        try:
+            from clawdy_walk import monitors
+            sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+            layout = tuple(monitors(sw, sh))
+            if self._screens is not None and layout != self._screens:
+                self._mon_cache = None
+                self._pet_mon = None
+                if self.walk:
+                    self.end_walk(home=False)
+                self.ensure_visible(layout)
+            self._screens = layout
+        except tk.TclError:
+            return
+        except Exception:
+            pass
+        self.root.after(5000, self.watch_screens)
+
+    def ensure_visible(self, mons):
+        """Bring Clawdy back onto a real monitor if its middle is on none of them."""
+        k = self.k
+        cw, h = round(CW * k), round(H * k)
+        x, y = self.root.winfo_x(), self.root.winfo_y()
+        if self._monitor_of(mons, x + cw // 2, y + h // 2) or self.held or self._drag:
+            return
+        self.root.geometry("+%d+%d" % self.home_xy())
 
     def toggle_pet(self):
         """Switch between the card and a free-roaming pet."""
@@ -1342,6 +1384,15 @@ class Widget:
                 sessions.resume_codex(s)
             else:
                 got = cs.focus_session(s)
+                if got == "notice" and cs.on_gnome_wayland() and not cs.gnome_focus_installed():
+                    self.flash(tr("focus.installing"), 6)      # Clawdy's own 30-line extension; gone with --uninstall
+                    self.root.update_idletasks()
+                    how = cs.install_gnome_focus()
+                    if how == "live":
+                        got = cs.focus_session(s)
+                    else:
+                        self.flash(tr("focus.relogin") if how == "relogin" else how, 8)
+                        return
                 if got == "notice":
                     self.flash(tr("sessions.notice"), 5)
                 elif not got:

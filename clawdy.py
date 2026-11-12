@@ -76,6 +76,9 @@ def main(argv):
         return 0 if clawdy_system.send_to_running(b"walk") else 1
     if "--skin" in argv:
         return 0 if clawdy_system.send_to_running(b"creator") else 1
+    if "--gnome-focus" in argv:          # install the GNOME Shell extension that lets Clawdy raise windows
+        print(clawdy_system.install_gnome_focus())
+        return 0
     if "--uninstall" in argv:
         clawdy_system.uninstall()
         return 0

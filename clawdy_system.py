@@ -748,6 +748,14 @@ def _focus_linux(pid, tty, term):
             if out:
                 return subprocess.run(["xdotool", "windowactivate", out[-1]],
                                       capture_output=True, timeout=2).returncode == 0
+    if os.environ.get("WAYLAND_DISPLAY") and gnome_focus_installed():
+        # GNOME Wayland: only the Shell may raise a window, and Clawdy's extension asks it to
+        owner = _pty_owner(tty) if tty else None
+        chain = _ancestors(pid)[0] if pid else []
+        for p in ([owner] if owner else []) + [p for p in chain if p != owner]:
+            if _shell_activate(p):
+                _ring(tty)
+                return True
     if term.get("PTYXIS_VERSION") and shutil.which("gdbus"):
         # Wayland: no app may raise another's window. Asked over D-Bus, Ptyxis presents its own
         # (it doesn't open a new one) and GNOME, refusing the focus, shows its "is ready" notice:
@@ -761,6 +769,104 @@ def _focus_linux(pid, tty, term):
     if tty and os.environ.get("WAYLAND_DISPLAY"):
         _ring(tty)
     return False
+
+
+GNOME_EXT = "focus@clawdy.app"
+GNOME_EXT_DIR = os.path.join(HOME, ".local", "share", "gnome-shell", "extensions", GNOME_EXT)
+
+
+def on_gnome_wayland():
+    return (not WIN and not MAC and bool(os.environ.get("WAYLAND_DISPLAY"))
+            and "gnome" in (os.environ.get("XDG_CURRENT_DESKTOP") or "").lower())
+
+
+def gnome_focus_installed():
+    return os.path.isfile(os.path.join(GNOME_EXT_DIR, "extension.js"))
+
+
+def gnome_focus_live():
+    """True when GNOME Shell answers on Clawdy's extension (installed and loaded)."""
+    try:
+        r = subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path",
+                            "/app/clawdy/Focus", "--method", "app.clawdy.Focus.Version"],
+                           capture_output=True, text=True, timeout=3)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+def install_gnome_focus():
+    """Copy Clawdy's tiny GNOME Shell extension into place and enable it. Returns "live" when
+    GNOME took it right away, "relogin" when it needs the next login, or an error."""
+    src = resource("assets", "gnome", GNOME_EXT)
+    try:
+        if os.path.isdir(GNOME_EXT_DIR):
+            shutil.rmtree(GNOME_EXT_DIR)
+        shutil.copytree(src, GNOME_EXT_DIR)
+        subprocess.run(["gnome-extensions", "enable", GNOME_EXT], capture_output=True, timeout=10)
+    except Exception as e:
+        return str(e)[:100]
+    for _ in range(10):
+        if gnome_focus_live():
+            return "live"
+        time.sleep(0.3)
+    # GNOME Shell only scans the extensions folder at login, so `enable` of a brand-new one is
+    # refused: list it in the setting ourselves and it starts enabled at the next login.
+    try:
+        import ast
+        cur = subprocess.run(["gsettings", "get", "org.gnome.shell", "enabled-extensions"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+        names = ast.literal_eval(cur.split(" ", 1)[1] if cur.startswith("@") else cur) if cur else []
+        if GNOME_EXT not in names:
+            names.append(GNOME_EXT)
+            subprocess.run(["gsettings", "set", "org.gnome.shell", "enabled-extensions", repr(list(names))],
+                           capture_output=True, timeout=5)
+    except Exception:
+        pass
+    return "relogin"
+
+
+def remove_gnome_focus():
+    if not os.path.isdir(GNOME_EXT_DIR):
+        return
+    try:
+        subprocess.run(["gnome-extensions", "disable", GNOME_EXT], capture_output=True, timeout=10)
+    except Exception:
+        pass
+    shutil.rmtree(GNOME_EXT_DIR, ignore_errors=True)
+
+
+def _shell_activate(pid):
+    """Ask GNOME Shell, through Clawdy's extension, to raise the window of a process."""
+    try:
+        r = subprocess.run(["gdbus", "call", "--session", "--dest", "org.gnome.Shell", "--object-path",
+                            "/app/clawdy/Focus", "--method", "app.clawdy.Focus.ActivateByPid", str(int(pid))],
+                           capture_output=True, text=True, timeout=3)
+        return r.returncode == 0 and "true" in r.stdout
+    except Exception:
+        return False
+
+
+def _pty_owner(tty):
+    """The process holding the master side of a pty (the terminal emulator), on Linux."""
+    try:
+        index = int(tty.rsplit("/", 1)[1])
+    except (ValueError, IndexError):
+        return None
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        fds = "/proc/%s/fd" % name
+        try:
+            for fd in os.listdir(fds):
+                if os.readlink(os.path.join(fds, fd)) != "/dev/ptmx":
+                    continue
+                with open("/proc/%s/fdinfo/%s" % (name, fd)) as f:
+                    if ("tty-index:\t%d\n" % index) in f.read():
+                        return int(name)
+        except OSError:
+            continue
+    return None
 
 
 def _ring(tty):
@@ -908,6 +1014,7 @@ def setup(hooks=True, autostart=True):
 
 def uninstall():
     ask_running_to_quit()
+    remove_gnome_focus()
     set_hooks(False)
     try:
         set_autostart(False)

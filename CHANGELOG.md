@@ -9,14 +9,22 @@ All notable changes to Clawdy are listed here. Versions follow
   Claude Code is still running are listed under *Open now*, and clicking one
   brings its terminal to the front instead of starting a second copy: the very
   tab in tmux, kitty, WezTerm, Terminal.app and iTerm2; the window on Windows
-  and X11; on GNOME Wayland (Ptyxis) GNOME only allows its "is ready" notice,
-  one click away, and the tab gets marked.
+  and X11. On GNOME Wayland apps may not raise each other's windows, so the
+  first click installs a tiny GNOME Shell extension of Clawdy's ("Clawdy
+  Focus", removed again by **Disconnect**) that does it from inside the shell;
+  until GNOME loads it you get its "is ready" notice instead. The tab gets
+  marked with a bell.
   The hook now records Claude Code's own pid (its shell exits at once), its
   tty and the terminal's markers, so open sessions are detected reliably.
 - **The panel stays on screen.** It picks the side to slide out on from the
   monitor Clawdy is on (not the whole desktop), flips sides when it wouldn't
   fit, and keeps itself inside that monitor even when Clawdy hangs off an edge.
   It also folds away while you carry Clawdy around.
+- **Clawdy survives plugging screens in and out.** When a monitor is added,
+  removed or moved, Clawdy notices within a few seconds and, if it was left in
+  a spot no screen covers any more, steps back onto the nearest one (pets to
+  that screen's floor). Its home corner is now a corner of the primary monitor,
+  not of the whole desktop.
 - **A crew for parallel sessions.** When several Claude Code or Codex sessions
   work at the same time, each extra one gets a mini Clawdy beside the big one
   (dressed the same), acting out its own state: tapping away, hopping on

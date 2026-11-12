@@ -57,17 +57,72 @@ def _monitor_windows(x, y):
     return (m.left, m.top, m.right, m.bottom), floor
 
 
-def _monitor_linux(x, y, sw, sh):
-    mons, primary_top = [], None
+def _monitors_linux():
+    """[(rect, is_primary)] from xrandr (XWayland answers too)."""
+    mons = []
+    out = subprocess.run(["xrandr", "--listmonitors"], capture_output=True, text=True, timeout=3).stdout
+    for line in out.splitlines():
+        m = re.search(r"(\*?)\S*\s+(\d+)/\d+x(\d+)/\d+\+(\d+)\+(\d+)", line)
+        if m:
+            w, h, mx, my = map(int, m.groups()[1:])
+            mons.append(((mx, my, mx + w, my + h), "*" in line.split()[1]))
+    return mons
+
+
+def _monitors_mac():
+    from AppKit import NSScreen
+    screens = NSScreen.screens()
+    h0 = screens[0].frame().size.height
+    mons = []
+    for i, s in enumerate(screens):
+        f = s.frame()
+        left, top = f.origin.x, h0 - (f.origin.y + f.size.height)
+        mons.append(((left, top, left + f.size.width, top + f.size.height), i == 0))
+    return mons
+
+
+def _monitors_windows():
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    proc = ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HMONITOR, wintypes.HDC,
+                              ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+    mons = []
+
+    def cb(hmon, hdc, lprc, lparam):
+        r = lprc.contents
+        mons.append(((r.left, r.top, r.right, r.bottom), r.left == 0 and r.top == 0))
+        return 1
+    user32.EnumDisplayMonitors(None, None, proc(cb), 0)
+    return mons
+
+
+def monitors(sw, sh):
+    """Every monitor as (rect, is_primary); the whole screen when the system won't say."""
     try:
-        out = subprocess.run(["xrandr", "--listmonitors"], capture_output=True, text=True, timeout=3).stdout
-        for line in out.splitlines():
-            m = re.search(r"(\*?)\S*\s+(\d+)/\d+x(\d+)/\d+\+(\d+)\+(\d+)", line)
-            if m:
-                w, h, mx, my = map(int, m.groups()[1:])
-                mons.append(((mx, my, mx + w, my + h), "*" in line.split()[1]))
+        mons = (_monitors_windows if WIN else _monitors_mac if MAC else _monitors_linux)()
     except Exception:
-        pass
+        mons = []
+    return mons or [((0, 0, sw, sh), True)]
+
+
+def nearest_monitor(mons, x, y):
+    """The monitor under a point, else the closest one: a point left in the void when a
+    screen was unplugged or moved still gets a real monitor."""
+    for rect, _ in mons:
+        if rect[0] <= x < rect[2] and rect[1] <= y < rect[3]:
+            return rect
+    def dist(rect):
+        dx = max(rect[0] - x, 0, x - rect[2] + 1)
+        dy = max(rect[1] - y, 0, y - rect[3] + 1)
+        return dx * dx + dy * dy
+    return min((rect for rect, _ in mons), key=dist)
+
+
+def _monitor_linux(x, y, sw, sh):
+    mons = monitors(sw, sh)
+    rect = nearest_monitor(mons, x, y)
+    is_primary = next((p for r, p in mons if r == rect), False)
     panel = 0
     try:
         out = subprocess.run(["xprop", "-root", "_NET_WORKAREA"], capture_output=True, text=True, timeout=3).stdout
@@ -77,10 +132,7 @@ def _monitor_linux(x, y, sw, sh):
             panel = vals[1] - primary[1]          # GNOME's top bar on the primary monitor
     except Exception:
         pass
-    for rect, is_primary in mons:
-        if rect[0] <= x < rect[2] and rect[1] <= y < rect[3]:
-            return rect, rect[1] + (panel if is_primary else 0)
-    return (0, 0, sw, sh), 0
+    return rect, rect[1] + (panel if is_primary else 0)
 
 
 def _monitor_mac(x, y, sw, sh):
@@ -88,13 +140,14 @@ def _monitor_mac(x, y, sw, sh):
         from AppKit import NSScreen
         screens = NSScreen.screens()
         h0 = screens[0].frame().size.height
+        rects = []
         for s in screens:
             f, v = s.frame(), s.visibleFrame()
             left, top = f.origin.x, h0 - (f.origin.y + f.size.height)
-            rect = (left, top, left + f.size.width, top + f.size.height)
-            if rect[0] <= x < rect[2] and rect[1] <= y < rect[3]:
-                inset = (f.origin.y + f.size.height) - (v.origin.y + v.size.height)
-                return rect, top + inset
+            inset = (f.origin.y + f.size.height) - (v.origin.y + v.size.height)
+            rects.append(((left, top, left + f.size.width, top + f.size.height), top + inset))
+        rect = nearest_monitor([(r, False) for r, _ in rects], x, y)
+        return rect, next(t for r, t in rects if r == rect)
     except Exception:
         pass
     return (0, 0, sw, sh), 30

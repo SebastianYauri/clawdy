@@ -1,0 +1,8 @@
+{
+  "uuid": "focus@clawdy.app",
+  "name": "Clawdy Focus",
+  "description": "Lets Clawdy bring the terminal of a Claude Code session to the front (Wayland allows this only from inside GNOME Shell).",
+  "shell-version": ["45", "46", "47", "48", "49", "50", "51", "52"],
+  "url": "https://github.com/SebastianYauri/clawdy",
+  "version": 1
+}

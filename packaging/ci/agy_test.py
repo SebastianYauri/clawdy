@@ -21,7 +21,10 @@ PAYLOAD = {"cwd": HOME, "conversation_id": "ci-conv-1", "agent_state": "idle",
 
 
 def run(command, stdin):
-    shell = ["cmd", "/c", command] if platform.system() == "Windows" else ["sh", "-c", command]
+    if platform.system() == "Windows":          # as agy does: the raw line to cmd (a list would re-escape the quotes)
+        shell = 'cmd /d /s /c "%s"' % command
+    else:
+        shell = ["sh", "-c", command]
     return subprocess.run(shell, input=stdin, capture_output=True, text=True, timeout=20)
 
 
