@@ -83,6 +83,36 @@ class Skins:
         return [(X0 + x * CELL, Y0 + y * CELL, n * CELL, h * CELL, col) for x, y, n, h, col in merged]
 
 
+def frame_runs(tk_module, path):
+    """[(x, y, w, h, '#rrggbb')] of a whole image, one unit per image pixel, any size:
+    the frames of the bigger animations (the sleigh) are drawn straight from PNGs."""
+    img = tk_module.PhotoImage(file=path)
+    w, h = img.width(), img.height()
+    runs = []
+    for py in range(h):
+        run = None
+        for px in range(w + 1):
+            col = None
+            if px < w and not img.transparency_get(px, py):
+                r, g, b = img.get(px, py)[:3]
+                col = "#%02x%02x%02x" % (r, g, b)
+            if run and col == run[1]:
+                run[2] += 1
+                continue
+            if run:
+                runs.append([run[0], py, run[2], 1, run[1]])
+            run = [px, col, 1] if col else None
+    merged = []
+    for x, y, n, _, col in runs:
+        for m in merged:
+            if m[0] == x and m[2] == n and m[4] == col and m[1] + m[3] == y:
+                m[3] += 1
+                break
+        else:
+            merged.append([x, y, n, 1, col])
+    return [tuple(m) for m in merged], w, h
+
+
 def write_png(tk_module, path, pix):
     """A 32×32 PNG from {(px, py): '#rrggbb'}; everything else transparent."""
     img = tk_module.PhotoImage(width=SIZE, height=SIZE)

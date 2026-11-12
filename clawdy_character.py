@@ -8,9 +8,11 @@ import random
 import clawdy_system as cs
 
 SLOTS = ("head", "face", "body")
-PARTS = {"head": ["witch", "santa", "frank", "slick", "cowboy", "chef", "pirate", "astronaut", "ninja"],
-         "face": ["stitches", "fangs", "glasses", "eyepatch", "blush"],
-         "body": ["cape", "bolts", "sheet", "pumpkin", "scarf", "bandana"]}
+PARTS = {"head": ["witch", "santa", "elf", "antlers", "tophat", "frank", "slick", "cowboy", "chef", "pirate",
+                  "astronaut", "ninja"],
+         "face": ["stitches", "fangs", "rednose", "carrot", "glasses", "eyepatch", "blush"],
+         "body": ["cape", "bolts", "sheet", "pumpkin", "scarf", "snowcoat", "gingerbread", "tree", "sweater",
+                  "bandana"]}
 # body colors: (key, rgb 0-1). The first one is Clawdy's own.
 COLORS = [("orange", (0.851, 0.467, 0.341)), ("coral", (0.93, 0.42, 0.42)), ("gold", (0.93, 0.70, 0.25)),
           ("green", (0.33, 0.72, 0.50)), ("teal", (0.25, 0.65, 0.68)), ("sky", (0.40, 0.65, 0.92)),
@@ -19,12 +21,17 @@ COLORS = [("orange", (0.851, 0.467, 0.341)), ("coral", (0.93, 0.42, 0.42)), ("go
 PRESETS = {"none": {}, "witch": {"head": "witch"}, "pumpkin": {"body": "pumpkin"}, "ghost": {"body": "sheet"},
            "vampire": {"head": "slick", "face": "fangs", "body": "cape"},
            "frank": {"head": "frank", "face": "stitches", "body": "bolts"}, "santa": {"head": "santa"},
+           "elf": {"head": "elf", "body": "sweater"}, "reindeer": {"head": "antlers", "face": "rednose"},
+           "snowman": {"head": "tophat", "face": "carrot", "body": "snowcoat"},
+           "gingerbread": {"body": "gingerbread"}, "tree": {"body": "tree"},
            "cowboy": {"head": "cowboy", "body": "bandana"}, "chef": {"head": "chef"},
            "pirate": {"head": "pirate", "face": "eyepatch"}, "astronaut": {"head": "astronaut"},
            "ninja": {"head": "ninja"}}
-PRESET_ORDER = ["none", "witch", "pumpkin", "ghost", "vampire", "frank", "santa",
-                "cowboy", "chef", "pirate", "astronaut", "ninja"]
-BEHAVES = ("ghost", "pumpkin", "witch", "vampire", "frank", "santa")   # presets with their own tricks
+PRESET_ORDER = ["none", "witch", "pumpkin", "ghost", "vampire", "frank", "santa", "elf", "reindeer",
+                "snowman", "gingerbread", "tree", "cowboy", "chef", "pirate", "astronaut", "ninja"]
+BEHAVES = ("ghost", "pumpkin", "witch", "vampire", "frank", "santa", "reindeer", "snowman",
+           "gingerbread", "tree", "elf")                     # presets with their own tricks
+XMAS = ("santa", "reindeer", "elf", "snowman", "gingerbread", "tree")   # the Christmas wardrobe, by day
 
 
 def load(cfg=None):
@@ -85,6 +92,32 @@ def part_path(slot, name, back=False):
     return cs.resource("assets", "parts", slot, name + ("_back" if back else "") + ".png")
 
 
+_FRAMES = {}
+FRAME_RATE = 3                                   # animated parts: frames per second
+
+
+def part_frames(slot, name):
+    """[paths] of an animated part (name.png, name_f2.png, name_f3.png…), cached."""
+    key = (slot, name)
+    if key not in _FRAMES:
+        frames = [part_path(slot, name)]
+        n = 2
+        while os.path.exists(cs.resource("assets", "parts", slot, "%s_f%d.png" % (name, n))):
+            frames.append(cs.resource("assets", "parts", slot, "%s_f%d.png" % (name, n)))
+            n += 1
+        _FRAMES[key] = frames
+    return _FRAMES[key]
+
+
+def part_now(slot, name):
+    """The frame of a part to draw right now (a twinkle, a glowing nose…)."""
+    frames = part_frames(slot, name)
+    if len(frames) == 1:
+        return frames[0]
+    import time
+    return frames[int(time.time() * FRAME_RATE) % len(frames)]
+
+
 def skins_folder():
     return os.path.join(cs.config_dir(), "skins")
 
@@ -110,7 +143,7 @@ def layers(ch, layer):
         return paths
     for slot in ("body", "head", "face"):
         if ch.get(slot):
-            paths.append(part_path(slot, ch[slot]))
+            paths.append(part_now(slot, ch[slot]))
     if ch.get("skin"):
         paths.append(os.path.join(skins_folder(), ch["skin"] + ".png"))
         back = os.path.join(skins_folder(), ch["skin"] + "_back.png")

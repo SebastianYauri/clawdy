@@ -194,6 +194,11 @@ STRINGS = {
     "costume.vampire": ("Vampire", "Vampiro"),
     "costume.frank": ("Frankenstein", "Frankenstein"),
     "costume.santa": ("Santa", "Noel"),
+    "costume.elf": ("Elf", "Elfo"),
+    "costume.reindeer": ("Reindeer", "Reno"),
+    "costume.snowman": ("Snowman", "Nieve"),
+    "costume.gingerbread": ("Gingerbread", "Jengibre"),
+    "costume.tree": ("Tree", "Árbol"),
 
     "welcome.title": ("Welcome to Clawdy", "Bienvenido a Clawdy"),
     "welcome.hi": ("Hi! I'm Clawdy", "¡Hola! Soy Clawdy"),

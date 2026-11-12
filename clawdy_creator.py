@@ -29,10 +29,7 @@ class Creator:
         self.h = self.layout_height()
         pw, ph = round(MW * self.k), round(self.h * self.k)
         self.canvas = w.make_window(self.win, pw, ph)
-        sw, sh = self.win.winfo_screenwidth(), self.win.winfo_screenheight()
-        x = max(4, min(x_root, sw - pw - 4))
-        y = max(4, min(y_root, sh - ph - 4))
-        self.win.geometry("+%d+%d" % (x, y))
+        self.win.geometry("+%d+%d" % w.fit_on_monitor(x_root, y_root, pw, ph))
         self.win.update_idletasks()
         w.round_corners(self.win, pw, ph, radius=14)
         c = self.canvas

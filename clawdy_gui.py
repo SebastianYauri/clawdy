@@ -32,7 +32,7 @@ tk = None            # imported in run(): the hook doesn't need tkinter
 URL = "https://api.anthropic.com/api/oauth/usage"
 POLL = 300          # seconds between usage requests
 UPDATE_EVERY = 6 * 3600             # look for new versions every 6 hours
-FPS, FPS_FAST = 30, 60             # frames/s when idle and while the panel moves
+FPS, FPS_FAST = 24, 60             # frames/s when idle and while the panel moves
 # Compact view: a vertical column. Expanding opens a side panel (towards the
 # free side of the screen); the column itself never moves.
 CW, H = 104, 114                    # compact column
@@ -77,6 +77,17 @@ def ease(t):
 
 def lerp(a, b, t):
     return a + (b - a) * t
+
+
+_RGB = {}
+
+
+def rgb(color):
+    """'#rrggbb' -> (r, g, b) in 0..1, cached."""
+    v = _RGB.get(color)
+    if v is None:
+        v = _RGB[color] = (int(color[1:3], 16) / 255, int(color[3:5], 16) / 255, int(color[5:7], 16) / 255)
+    return v
 
 
 def clamp(t):
@@ -600,6 +611,9 @@ class Widget:
         self.panel_left = True                      # the panel opens to the left
         self._mon_cache = None                      # (when, rect) of the monitor Clawdy was last on
         self._screens = None                        # the monitor layout, to notice a screen plugged or unplugged
+        self._pet_frame = None                      # the last frame handed to the GTK pet window
+        self._rec = None                            # drawing commands being recorded for it (see rect())
+        self._anchor = False                        # True while the Tk window is a 1-px anchor (GTK pet)
         self.col_in = self.panel_in = False
         self.left_at = 0.0
         self._hover_last = time.time()
@@ -834,6 +848,19 @@ class Widget:
         y = mon[1] + round(60 * k) if "t" in corner else mon[3] - h - round(60 * k)
         return x, y
 
+    def fit_on_monitor(self, x, y, w, h):
+        """Where to put a w×h window asked for at (x, y): inside the monitor under that point,
+        above the point when there's no room below (Clawdy on the bottom edge)."""
+        try:
+            mx0, my0, mx1, my1 = self.monitor_at(x, y)
+        except Exception:
+            mx0, my0, mx1, my1 = 0, 0, self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        fx = max(mx0 + 4, min(x, mx1 - w - 4))
+        fy = y
+        if fy + h > my1 - 4:
+            fy = y - h if y - h >= my0 + 4 else my1 - h - 4
+        return fx, max(my0 + 4, fy)
+
     @staticmethod
     def _monitor_of(mons, x, y):
         """The monitor rect under a point, or None when the point is in the void."""
@@ -885,6 +912,7 @@ class Widget:
                 self.petwin.close()
                 self.petwin = None
             self.pet_shaper = None
+            self.anchor(False)
             self.round_corners(self.root, cw, h)
         self.root.geometry("+%d+%d" % self.home_xy())
         if self.tray:
@@ -904,10 +932,28 @@ class Widget:
                 if self.pet_shaper is None:
                     self.pet_shaper = Shaper(self.root)
                 self.pet_shaper.set([(0, 0, 1, 1)])      # the Tk window becomes a 1-pixel anchor
+                self.anchor(True)
             except Exception as e:
                 self.log("pet gtk", e)
                 self.petwin = False
         return bool(self.petwin)
+
+    def card_w(self):
+        return round(CW * self.k)
+
+    def anchor(self, on):
+        """GTK pet: the Tk window shrinks to 1×1 so Tk stops rendering a canvas nobody sees
+        (the GTK window paints the frame); the canvas items are still there to snapshot."""
+        if on == self._anchor:
+            return
+        self._anchor = on
+        try:
+            if on:
+                self.root.geometry("1x1")
+            else:
+                self.root.geometry("%dx%d" % (self.card_w(), round(H * self.k)))
+        except tk.TclError:
+            pass
 
     def pet_shape(self):
         """Linux: clip the window to what was drawn, so the desktop shows through."""
@@ -1031,7 +1077,9 @@ class Widget:
     def costume(self):
         """Which built-in costume Clawdy behaves like right now (tricks, walks, props)."""
         if self.costume_pref == "auto":
-            return {"halloween": "witch", "christmas": "santa"}.get(season(), "none")
+            if season() == "christmas":                   # a different Christmas outfit every day
+                return character.XMAS[datetime.now().timetuple().tm_yday % len(character.XMAS)]
+            return "witch" if season() == "halloween" else "none"
         return character.identity(self.character)
 
     def character_now(self):
@@ -1096,7 +1144,7 @@ class Widget:
         else:
             x = self.root.winfo_rootx() - round(400 * self.k) - 8
             if x < 4:
-                x = self.root.winfo_rootx() + self.root.winfo_width() + 8
+                x = self.root.winfo_rootx() + self.card_w() + 8
             y = max(4, self.root.winfo_rooty() - 120)
         self.popup_menu = Creator(self, x, y)
 
@@ -1109,13 +1157,16 @@ class Widget:
             cs.save_config(cfg)
         except OSError:
             pass
-        right = self.root.winfo_x() + self.root.winfo_width()       # keep the right edge in place
+        right = self.root.winfo_x() + self.card_w()                 # keep the right edge in place
         self.k = self.base_k * scale
         k = self.k
         cw, pw, h = round(CW * k), round(PW * k), round(H * k)
         self.col_canvas.config(width=cw, height=h)
         self.pcanvas.config(width=pw, height=h)
-        self.root.geometry("%dx%d+%d+%d" % (cw, h, right - cw, self.root.winfo_y()))
+        if self._anchor:
+            self.root.geometry("+%d+%d" % (right - cw, self.root.winfo_y()))
+        else:
+            self.root.geometry("%dx%d+%d+%d" % (cw, h, right - cw, self.root.winfo_y()))
         self.panel.geometry("%dx%d" % (pw, h))
         self.root.update_idletasks()
         if self.pet:
@@ -1552,7 +1603,7 @@ class Widget:
             mw = round(PopupMenu.MW * self.k)
             x = self.root.winfo_rootx() - mw - 8
             if x < 4:
-                x = self.root.winfo_rootx() + self.root.winfo_width() + 8
+                x = self.root.winfo_rootx() + self.card_w() + 8
             y = self.root.winfo_rooty()
         self.popup_menu = PopupMenu(self, x, y, items=self.settings_items())
 
@@ -1594,6 +1645,12 @@ class Widget:
             self.queue_alerts()
             self._fresh = True                  # the Tk thread records it (see after_data)
         if not self.ready and self.st.data and not self.st.error and self.st.fresh():
+            self.start_intro()
+        elif not self.ready and (self.st.data or self.st.need or self._backoff >= 2
+                                 or outcome not in ("offline", "skip")):
+            # no fresh numbers yet (Claude Code's session expired overnight, no network right after
+            # boot, rate limited…): still come out, with the last numbers or empty rings and the
+            # note, instead of pulsing dots until Claude Code is opened
             self.start_intro()
         if outcome == "offline":                # e.g. right after boot: retry soon, then back off
             self._backoff = min(self._backoff + 1, 6)
@@ -1997,26 +2054,65 @@ class Widget:
 
     # ------------------------------------------------ primitives
 
+    # While self._rec is a list (GTK pet window), the primitives append plain drawing commands
+    # to it instead of making Tk canvas items: the Tk window is a 1-px anchor there and nobody
+    # would see them, and a costume is a few hundred items a frame.
+
     def rect(self, x, y, w, h, color):
+        if self._rec is not None:
+            self._rec.append(("rectangle", [x, y, x + w, y + h], rgb(color)))
+            return
         self.canvas.create_rectangle(x, y, x + w, y + h, fill=color, width=0)
 
     def oval(self, cx, cy, rx, ry, color):
+        if self._rec is not None:
+            self._rec.append(("oval", [cx - rx, cy - ry, cx + rx, cy + ry], rgb(color)))
+            return
         self.canvas.create_oval(cx - rx, cy - ry, cx + rx, cy + ry, fill=color, width=0)
 
     def poly(self, pts, color):
+        if self._rec is not None:
+            self._rec.append(("polygon", [v for p in pts for v in p], rgb(color)))
+            return
         self.canvas.create_polygon(pts, fill=color, width=0)
+
+    def line(self, pts, color, width=1):
+        if self._rec is not None:
+            self._rec.append(("line", list(pts), rgb(color), width))
+            return
+        self.canvas.create_line(pts, fill=color, width=width)
+
+    def arc(self, x0, y0, x1, y1, start, extent, color, width=1):
+        """An open arc (Tk angles: degrees counter-clockwise from 3 o'clock)."""
+        if self._rec is not None:
+            self._rec.append(("arc", [x0, y0, x1, y1], rgb(color), start, extent, width))
+            return
+        self.canvas.create_arc(x0, y0, x1, y1, start=start, extent=extent, style="arc", outline=color, width=width)
 
     def text(self, x, y, s, color, size=12, bold=False, anchor="w", mono=False):
         size = max(5, round(size * self.fscale * self.scale))
+        if self._rec is not None:
+            self._rec.append(("text", [x, y], rgb(color), s, self.mono if mono else self.fam, size, bold, anchor))
+            return
         self.canvas.create_text(x, y, text=s, fill=color, anchor=anchor,
                                 font=(self.mono if mono else self.fam, size,
                                       "bold" if bold else "normal"))
+
+    def rec_transform(self, start, fn):
+        """Apply fn(x, y) -> (x, y) to every recorded command since index `start`."""
+        for op in self._rec[start:]:
+            pts = op[1]
+            for i in range(0, len(pts), 2):
+                pts[i], pts[i + 1] = fn(pts[i], pts[i + 1])
 
     def lw(self, w):
         return max(1, round(w * self.fscale * self.scale))
 
     def px_rect(self, xf, x, y, color, w=PX, h=PX):
         """One sprite block, transformed."""
+        if self._rec is not None:
+            self.blocks(xf, [(x, y, w, h, color)])
+            return
         if xf.rot:
             self.poly([xf.pt(x, y), xf.pt(x + w, y), xf.pt(x + w, y + h), xf.pt(x, y + h)], color)
         else:
@@ -2562,7 +2658,7 @@ class Widget:
             d = random.choice((-1, 1))
             self.spawn("bat", cx - d * 95, random.uniform(28, 60), d * 75, 0, 2.6,
                        ph=random.uniform(0, 6))
-        elif costume == "santa" and random.random() < dt * 3:  # snow
+        elif costume in character.XMAS and random.random() < dt * 3:  # snow
             self.spawn("snow", cx + random.uniform(-75, 75), 18, random.uniform(-6, 6), 20, 4.5,
                        ph=random.uniform(0, 6))
 
@@ -2794,14 +2890,52 @@ class Widget:
             if fx:                                   # e.g. a hat trailing in the wind
                 tx, ty = xf.pt(fx[0], fx[1])
                 pxf = Xform(tx, ty, xf.sx, xf.sy, xf.rot + fx[2])
-            for x, y, w, h, col in self.skins.runs(path) or []:
-                self.px_rect(pxf, x, y, col, w, h)
+            self.blocks(pxf, self.skins.runs(path) or [])
+
+    def blocks(self, xf, runs):
+        """Many sprite blocks at once: one Tcl command instead of one call per block (a costume
+        is a few hundred blocks a frame; the round trips were a third of a core)."""
+        if not runs:
+            return
+        if self._rec is not None:
+            rec = self._rec
+            if xf.rot:
+                for x, y, bw, bh, col in runs:
+                    rec.append(("polygon", [*xf.pt(x, y), *xf.pt(x + bw, y), *xf.pt(x + bw, y + bh), *xf.pt(x, y + bh)],
+                                rgb(col)))
+            else:
+                for x, y, bw, bh, col in runs:
+                    x0, y0 = xf.pt(x, y)
+                    x1, y1 = xf.pt(x + bw, y + bh)
+                    rec.append(("rectangle", [round(x0), round(y0), round(x1), round(y1)], rgb(col)))
+            return
+        w = self.canvas._w
+        if xf.rot:
+            data = " ".join("%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %s" % (*xf.pt(x, y), *xf.pt(x + bw, y),
+                                                                            *xf.pt(x + bw, y + bh), *xf.pt(x, y + bh), col)
+                            for x, y, bw, bh, col in runs)
+            self.root.tk.eval("foreach {a b c d e f g h col} {%s} {%s create polygon $a $b $c $d $e $f $g $h -fill $col -width 0}"
+                              % (data, w))
+        else:
+            parts = []
+            for x, y, bw, bh, col in runs:
+                x0, y0 = xf.pt(x, y)
+                x1, y1 = xf.pt(x + bw, y + bh)
+                parts.append("%d %d %d %d %s" % (round(x0), round(y0), round(x1), round(y1), col))
+            self.root.tk.eval("foreach {a b c d col} {%s} {%s create rectangle $a $b $c $d -fill $col -width 0}"
+                              % (" ".join(parts), w))
 
     def draw_props(self, props, bx, by, bt, t, arm_r):
         """Floating props are pulled towards Clawdy so the whole animation fits in
         the porthole; props it holds stay put."""
         cx, cy = bx, bt + SH / 2
         for pr in props:
+            if self._rec is not None:
+                start = len(self._rec)
+                self.draw_prop(pr, bx, by, bt, t, arm_r)
+                if pr in FAR_PROPS:
+                    self.rec_transform(start, lambda x, y: ((x - cx) * REACH + cx, (y - cy) * REACH + cy))
+                continue
             mark = self.canvas.create_line(0, 0, 0, 0)
             self.draw_prop(pr, bx, by, bt, t, arm_r)
             if pr in FAR_PROPS:
@@ -2842,8 +2976,7 @@ class Widget:
             self.oval(ox, oy, 18, 11, hx((0.18, 0.16, 0.20)))
             self.oval(ox, oy - 9, 16, 4, hx((0.40, 0.85, 0.35)))
             sx_, sy_ = bx + SW / 2 - 4, bt + 22 + arm_r
-            self.canvas.create_line(sx_, sy_, ox - 4 + math.sin(t * 6) * 8, oy - 8,
-                                    fill=hx((0.55, 0.36, 0.20)), width=self.lw(3))
+            self.line((sx_, sy_, ox - 4 + math.sin(t * 6) * 8, oy - 8), hx((0.55, 0.36, 0.20)), self.lw(3))
             return
         if pr == "gift":                                 # present in hand
             gx, gy = bx, by - 22 + math.sin(t * 4) * 1.5
@@ -2856,8 +2989,7 @@ class Widget:
         if pr == "broomfly":                             # flying broom, under Clawdy
             d = self.dir
             y = by + self.fly_dy - 2
-            self.canvas.create_line(bx + d * 40, y - 6, bx - d * 36, y + 2,
-                                    fill=hx((0.62, 0.40, 0.22)), width=self.lw(4))
+            self.line((bx + d * 40, y - 6, bx - d * 36, y + 2), hx((0.62, 0.40, 0.22)), self.lw(4))
             self.poly([(bx - d * 34, y - 3), (bx - d * 52, y - 12), (bx - d * 56, y + 4),
                        (bx - d * 52, y + 14), (bx - d * 34, y + 7)], hx((0.92, 0.75, 0.35)))
             return
@@ -2880,7 +3012,7 @@ class Widget:
                 hx0, hy0 = bx + SW / 2 - 4, bt + 22 + arm_r
                 th = self.hammer
                 ex, ey = hx0 + math.sin(th) * 24, hy0 - math.cos(th) * 24
-                self.canvas.create_line(hx0, hy0, ex, ey, fill=hx((0.55, 0.36, 0.20)), width=self.lw(3))
+                self.line((hx0, hy0, ex, ey), hx((0.55, 0.36, 0.20)), self.lw(3))
                 hd = Xform(ex, ey, 1, 1, th)
                 self.poly([hd.pt(-8, -5), hd.pt(8, -5), hd.pt(8, 4), hd.pt(-8, 4)], hx((0.70, 0.70, 0.75)))
             elif pr == "book":
@@ -2891,8 +3023,7 @@ class Widget:
                     for i in range(4):
                         self.rect(x + 4, by - 22 + i * 3, 12, 1, hx((0.30, 0.30, 0.30), 0.6))
             elif pr == "headphones":
-                self.canvas.create_arc(bx - SW / 2 + 10, bt - 4, bx + SW / 2 - 10, bt + 20,
-                                       start=0, extent=180, style="arc", outline=dark, width=self.lw(4))
+                self.arc(bx - SW / 2 + 10, bt - 4, bx + SW / 2 - 10, bt + 20, 0, 180, dark, self.lw(4))
                 for x in (bx - SW / 2 + 7, bx + SW / 2 - 15):
                     self.rect(x, bt + 4, 8, 15, hx((0.85, 0.25, 0.30)))
             elif pr == "balls":
@@ -2916,9 +3047,8 @@ class Widget:
                     self.oval(ox, oy, 30, 30, hx((1.0, 0.92, 0.45), 0.22))
                     for i in range(8):
                         a = i * math.pi / 4 + t
-                        self.canvas.create_line(ox + math.cos(a) * 22, oy + math.sin(a) * 22,
-                                                ox + math.cos(a) * 30, oy + math.sin(a) * 30,
-                                                fill=hx((1.0, 0.92, 0.45)), width=self.lw(3))
+                        self.line((ox + math.cos(a) * 22, oy + math.sin(a) * 22,
+                                   ox + math.cos(a) * 30, oy + math.sin(a) * 30), hx((1.0, 0.92, 0.45)), self.lw(3))
                 self.oval(ox, oy, 17, 17, hx((1.0, 0.92, 0.45) if on else (0.55, 0.55, 0.50)))
                 self.oval(ox - 5, oy - 6, 4, 4, hx((1, 1, 1), 0.8 if on else 0.3))
                 self.rect(ox - 8, oy + 14, 16, 10, hx((0.60, 0.62, 0.66)))
@@ -2928,8 +3058,7 @@ class Widget:
                 mx, my = (bx - SW / 2 + 2, bt + 18) if sip else (bx - SW / 2 - 10, by - 14)
                 self.rect(mx - 6, my, 12, 12, hx((0.95, 0.95, 0.92)))
                 self.rect(mx - 4, my + 2, 8, 3, hx((0.45, 0.28, 0.18)))
-                self.canvas.create_arc(mx + 3, my + 2, mx + 11, my + 9, start=-90, extent=180,
-                                       style="arc", outline=hx((0.95, 0.95, 0.92)), width=self.lw(2))
+                self.arc(mx + 3, my + 2, mx + 11, my + 9, -90, 180, hx((0.95, 0.95, 0.92)), self.lw(2))
                 for i in range(2):
                     wob = math.sin(t * 4 + i * 2) * 2
                     self.oval(mx - 2 + i * 4 + wob, my - 5 - ((t * 10 + i * 5) % 8), 1.5, 2,
@@ -2960,8 +3089,7 @@ class Widget:
                     x = bx if side > 0 else bx - 20
                     self.rect(x - 1, by - 21, 22, 13, hx((0.55, 0.30, 0.20)))
                     self.rect(x + 1, by - 19, 18, 9, hx((0.97, 0.95, 0.88)))
-                self.canvas.create_line(lx + 7, ly + 7, lx + 16, ly + 16,
-                                        fill=hx((0.55, 0.36, 0.20)), width=self.lw(4))
+                self.line((lx + 7, ly + 7, lx + 16, ly + 16), hx((0.55, 0.36, 0.20)), self.lw(4))
                 self.oval(lx, ly, 10, 10, hx((0.75, 0.76, 0.80)))
                 self.oval(lx, ly, 8, 8, hx((0.70, 0.88, 1.0)))
                 self.oval(lx - 3, ly - 3, 2.5, 2, hx((1, 1, 1)))
@@ -2970,7 +3098,7 @@ class Widget:
                 sweep = math.sin(t * 9) * 6
                 hx0, hy0 = bx + d * (SW / 2 - 4), bt + 24
                 fx, fy = bx + d * (SW / 2 + 16) + sweep, by - 2
-                self.canvas.create_line(hx0, hy0, fx, fy - 6, fill=hx((0.55, 0.36, 0.20)), width=self.lw(3))
+                self.line((hx0, hy0, fx, fy - 6), hx((0.55, 0.36, 0.20)), self.lw(3))
                 self.poly([(fx - 8, fy), (fx + 8, fy), (fx + 4, fy - 8), (fx - 4, fy - 8)],
                           hx((0.85, 0.70, 0.35)))
 
@@ -3064,8 +3192,12 @@ class Widget:
                time.time() < self.alarm_until, time.time() < self.note_until and self.note_text,
                st.updated, st.retry_at > time.time(), int(time.time() // 30), self.update_label())
         if self.pet:                        # free-roaming pet: just Clawdy, the desktop shows through
-            self.canvas.delete("all")
-            mark = self.canvas.create_line(0, 0, 0, 0)
+            gtk = self.pet_gtk()
+            if gtk:
+                self._rec = []              # commands for the GTK window; nothing goes to Tk
+            else:
+                self.canvas.delete("all")
+            mark = None if gtk else self.canvas.create_line(0, 0, 0, 0)
             top = max((p for _, p, _ in rows), default=0)
             PET_K = 0.95
             globals()["NO_BLEND"] = True          # only while drawing the pet: menus and panels keep blending
@@ -3078,10 +3210,12 @@ class Widget:
                 col = (0.95, 0.40, 0.35) if time.time() < self.alarm_until else self.note_color
                 self.text(CW / 2, 8, text, hx(col), 6, bold=True, anchor="center")
             self.layer(mark, "dyn")
-            if self.pet_gtk():
-                import clawdy_petgtk
-                self.petwin.push(self.root.winfo_x(), self.root.winfo_y(), self.root.winfo_width(),
-                                 self.root.winfo_height(), clawdy_petgtk.snapshot(self.canvas, self.root))
+            if gtk:
+                ops, self._rec = self._rec, None
+                frame = (self.root.winfo_x(), self.root.winfo_y(), self.card_w(), round(H * self.k), ops)
+                if frame != self._pet_frame:          # nothing changed: nothing to repaint
+                    self._pet_frame = frame
+                    self.petwin.push(*frame)
             else:
                 self.pet_shape()
             if self.panel_out or self.e > 0:
@@ -3122,9 +3256,13 @@ class Widget:
 
     def layer(self, mark, tag):
         """Tag everything drawn after `mark` and scale it to screen size."""
-        for item in self.canvas.find_all():
-            if item > mark:
-                self.canvas.addtag_withtag(tag, item)
+        if self._rec is not None:
+            if self.k != 1.0:
+                kk = self.k
+                self.rec_transform(0, lambda x, y: (x * kk, y * kk))
+            return
+        w = self.canvas._w
+        self.root.tk.eval("foreach i [%s find all] {if {$i > %d} {%s addtag %s withtag $i}}" % (w, mark, w, tag))
         self.canvas.delete(mark)
         if self.k != 1.0:
             self.canvas.scale(tag, 0, 0, self.k, self.k)   # moves positions; images keep their size
@@ -3316,6 +3454,16 @@ class Widget:
 
     def draw_scene(self, top, k, ax, ay):
         """Clawdy and its props, drawn at full scale and then moved into place."""
+        if self._rec is not None:
+            start = len(self._rec)
+            self.fscale = k
+            try:
+                self.draw_clawd(SCENE_W / 2, 112, top)
+            finally:
+                self.fscale = 1.0
+            dx, dy = ax - SCENE_W / 2, ay - 85
+            self.rec_transform(start, lambda x, y: ((x - SCENE_W / 2) * k + SCENE_W / 2 + dx, (y - 85) * k + 85 + dy))
+            return
         mark = self.canvas.create_line(0, 0, 0, 0)
         self.fscale = k
         try:
@@ -3488,7 +3636,7 @@ class PopupMenu:
     def __init__(self, w, x_root, y_root, items=None, width=None):
         self.w, self.k = w, w.k
         self.hover, self.closed = None, False
-        self.opened = time.time()
+        self.opened = self.last_motion = time.time()
         self.left_at = self.opened + GRACE      # never reached by the mouse (e.g. opened from the tray): close soon
         if width:
             self.MW = width
@@ -3509,10 +3657,7 @@ class PopupMenu:
         self.win = tk.Toplevel(w.root)
         pw, ph = round(self.MW * k), round(self.h * k)
         self.canvas = w.make_window(self.win, pw, ph)
-        sw, sh = self.win.winfo_screenwidth(), self.win.winfo_screenheight()
-        x = max(4, min(x_root, sw - pw - 4))
-        y = max(4, min(y_root, sh - ph - 4))
-        self.win.geometry("+%d+%d" % (x, y))
+        self.win.geometry("+%d+%d" % w.fit_on_monitor(x_root, y_root, pw, ph))
         self.win.update_idletasks()
         w.round_corners(self.win, pw, ph, radius=12)
         c = self.canvas
@@ -3629,7 +3774,7 @@ class PopupMenu:
         return None
 
     def on_motion(self, ev):
-        self.left_at = None
+        self.left_at, self.last_motion = None, time.time()
         hit = self.find(ev)
         if (hit and hit[0]) != (self.hover and self.hover[0]):
             self.hover = hit
@@ -3662,11 +3807,28 @@ class PopupMenu:
             else:
                 self.draw()
 
+    def pointer_inside(self):
+        try:
+            px, py = self.win.winfo_pointerxy()
+            x, y = self.win.winfo_rootx(), self.win.winfo_rooty()
+            return x <= px < x + self.win.winfo_width() and y <= py < y + self.win.winfo_height()
+        except tk.TclError:
+            return False
+
     def watch(self):
         """Close by itself once the mouse has been gone for a while."""
         if self.closed:
             return
-        if self.left_at and time.time() - self.left_at > LEAVE_CLOSE:
+        now = time.time()
+        # A menu that opens under a still cursor gets no Enter event; the pointer position says it
+        # is there. Only early on: once the pointer leaves to a Wayland window, X11 keeps reporting
+        # its last position inside the menu, and the menu would never close.
+        if now - self.opened < 6 and self.pointer_inside():
+            self.left_at = None
+        if self.left_at and now - self.left_at > LEAVE_CLOSE:
+            self.close()
+            return
+        if now - self.last_motion > 45:         # safety net: nothing moved in a long while
             self.close()
             return
         self.win.after(200, self.watch)
@@ -3679,6 +3841,8 @@ class PopupMenu:
         except (tk.TclError, KeyError):
             focus = None
         if focus is None and time.time() - self.opened > 0.4:   # clicked somewhere else
+            if time.time() - self.opened < 6 and self.pointer_inside():
+                return
             self.close()
 
     def close(self):

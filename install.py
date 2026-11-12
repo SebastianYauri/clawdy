@@ -69,6 +69,8 @@ def main():
     shutil.copytree(os.path.join(SRC, "assets", "parts"), os.path.join(DEST, "assets", "parts"))
     shutil.rmtree(os.path.join(DEST, "assets", "codex-pet"), ignore_errors=True)
     shutil.copytree(os.path.join(SRC, "assets", "codex-pet"), os.path.join(DEST, "assets", "codex-pet"))
+    shutil.rmtree(os.path.join(DEST, "assets", "anim"), ignore_errors=True)
+    shutil.copytree(os.path.join(SRC, "assets", "anim"), os.path.join(DEST, "assets", "anim"))
     shutil.rmtree(os.path.join(DEST, "assets", "gnome"), ignore_errors=True)
     shutil.copytree(os.path.join(SRC, "assets", "gnome"), os.path.join(DEST, "assets", "gnome"))
     add_to_menu(main_py)

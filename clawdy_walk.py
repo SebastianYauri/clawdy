@@ -7,7 +7,9 @@ slides down a rope back into the porthole.
 
 In costume it goes out its own way: the vampire flies off as a bat, the ghost
 floats around (and says boo), the witch rides her broom, the pumpkin bounces,
-Frankenstein stomps with its arms out and Santa keeps his hat on.
+Frankenstein stomps with its arms out, and Santa and the reindeer take the sleigh: it
+lifts off from the porthole, crosses the top of the screen, comes round from the other
+side and lands back home (frames pre-rendered in 3D, assets/anim/sleigh).
 
 Clawdy travels in its own small borderless window (color key on Windows, real
 transparency on macOS, the X SHAPE extension on Linux) and the rope is a thin
@@ -156,6 +158,23 @@ def _monitor_mac(x, y, sw, sh):
 # ---------------------------------------------------------------- the sprite
 
 FLIERS = ("vampire", "ghost", "witch", "pumpkin")   # these leave by air instead of the rope
+SLEIGH = ("santa", "reindeer")                      # these take the sleigh
+SLEIGH_FRAMES = 6
+SLEIGH_SEAT = (51, 14)                              # where Clawdy sits in a sleigh frame (image pixels)
+
+
+def sleigh_frames(widget):
+    """The sleigh's frames as rect runs, or None if the files aren't there."""
+    import clawdy_system as cs
+    from clawdy_skins import frame_runs
+    out = []
+    try:
+        for i in range(SLEIGH_FRAMES):
+            runs, w, h = frame_runs(widget.skins.tk, cs.resource("assets", "anim", "sleigh", "%d.png" % i))
+            out.append(runs)
+        return out, w, h
+    except Exception:
+        return None
 
 
 def bat(frame, blink=False):
@@ -269,12 +288,17 @@ class Walk:
         self.root = widget.root
         k = widget.k
         self.p = p = max(3, round(3.7 * k))
-        self.pw, self.ph = GW * p, GH * p
         self.t = 0.0
         self.i = 0
         self.wave_until = 0.0
         self.trail = []
         self.costume = widget.costume()
+        self.gw, self.gh, self.frames = GW, GH, None
+        if self.costume in SLEIGH:
+            got = sleigh_frames(widget)
+            if got:
+                self.frames, self.gw, self.gh = got
+        self.pw, self.ph = self.gw * p, self.gh * p
         self.colors = widget.body_colors()
         self.wear = wear_from(widget)
         self.shaper = None
@@ -287,7 +311,12 @@ class Walk:
         self.pcx = wx + 52 * k                   # porthole center
         self.pcy = wy + 54 * k
         self.wb = wy + h                         # widget bottom
-        if self.costume in FLIERS:               # by air: no rope, any system
+        if self.frames:                          # the sleigh: across the top of the screen
+            self.mon, top = ((_monitor_windows(self.pcx, self.pcy)[0], None) if WIN
+                             else (_monitor_mac if MAC else _monitor_linux)(self.pcx, self.pcy, sw, sh))
+            self.lane = (top if top is not None else self.mon[1]) + 24 * k
+            self.mode = "sleigh"
+        elif self.costume in FLIERS:             # by air: no rope, any system
             self.mon = ((_monitor_windows(self.pcx, self.pcy)[0]) if WIN
                         else (_monitor_mac if MAC else _monitor_linux)(self.pcx, self.pcy, sw, sh)[0])
             self.mode = "fly"
@@ -306,7 +335,13 @@ class Walk:
         self.v = 70 * k
 
         x0 = self.pcx - self.pw / 2
-        if self.mode == "fly":
+        if self.mode == "sleigh":
+            self.x0, self.y0 = self.pcx - SLEIGH_SEAT[0] * p, self.pcy - SLEIGH_SEAT[1] * p
+            self.v = 170 * k
+            self.out = min(140 * k, max(0.0, self.mon[2] - self.x0 - self.pw))
+            self.phases = [("up", 1.6), ("cross", max(0.5, (self.mon[2] - (self.x0 + self.out)) / self.v)),
+                           ("wrap", max(0.5, (self.x0 - self.out - self.mon[0] + self.pw) / self.v)), ("land", 1.6)]
+        elif self.mode == "fly":
             self.D = max(0.0, min(320 * k, room))
             self.phases = [("out", 2.4), ("loop", 3.6), ("home", 2.4)]
             self.x0, self.y0 = x0, self.pcy - self.ph / 2
@@ -402,8 +437,47 @@ class Walk:
         name, dur = self.phases[self.i]
         q = (self.t - sum(d for _, d in self.phases[:self.i])) / dur if dur > 0 else 1.0
         frame = int(self.t * 6)
-        {"floor": self.floor_step, "ceiling": self.ceiling_step, "fly": self.fly_step}[self.mode](name, q, frame)
+        {"floor": self.floor_step, "ceiling": self.ceiling_step, "fly": self.fly_step,
+         "sleigh": self.sleigh_step}[self.mode](name, q, frame)
         return True
+
+    def sleigh_step(self, name, q, frame):
+        """Up out of the porthole, across the top to the right, round from the left, and home."""
+        x0, y0, lane, out, k = self.x0, self.y0, self.lane, self.out, self.w.k
+        if name == "up":
+            e = ease(q)
+            x, y = x0 + out * e, y0 + (lane - y0) * e
+        elif name == "cross":
+            x, y = x0 + out + (self.mon[2] - (x0 + out)) * q, lane
+        elif name == "wrap":
+            x, y = self.mon[0] - self.pw + (x0 - out - self.mon[0] + self.pw) * q, lane
+        else:
+            e = ease(q)
+            x, y = x0 - out + out * e, lane + (y0 - lane) * e
+        bob = math.sin(self.t * 2.6) * 4 * k
+        # a trail of sparkles behind the runners
+        self.trail = [(tx, ty, col, born) for tx, ty, col, born in self.trail if self.t - born < 0.6]
+        if int(self.t * 24) % 2 == 0:
+            self.trail.append((random.randint(0, 20), random.randint(self.gh - 10, self.gh - 2),
+                               random.choice(("#ffd75a", "#ffffff", "#8cd9ff")), self.t))
+        self.draw_frame(int(self.t * 10) % len(self.frames), x, y + bob,
+                        extra=[(tx, ty, 1, 1, col) for tx, ty, col, _ in self.trail])
+
+    def draw_frame(self, i, x, y, extra=()):
+        key = ("frame", i, len(extra))
+        if key != self._last_key:
+            self._last_key = key
+            c, p = self.canvas, self.p
+            c.delete("all")
+            rects = self.frames[i] + list(extra)
+            for rx, ry, rw, rh, col in rects:
+                c.create_rectangle(rx * p, ry * p, (rx + rw) * p, (ry + rh) * p, fill=col, width=0)
+            if self.shaper:
+                try:
+                    self.shaper.set([(rx * p, ry * p, rw * p, rh * p) for rx, ry, rw, rh, _ in rects])
+                except Exception:
+                    self.shaper = None
+        self.win.geometry("+%d+%d" % (round(x), round(y)))
 
     def fly_step(self, name, q, frame):
         """Out to the left by air, a loop there, and back into the porthole."""

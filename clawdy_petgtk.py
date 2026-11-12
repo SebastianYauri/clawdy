@@ -134,6 +134,22 @@ class PetWindow:
                     cr.line_to(pts[i], pts[i + 1])
                 cr.close_path()
                 cr.fill()
+            elif kind == "arc":                      # Tk angles: degrees counter-clockwise from 3 o'clock
+                x0, y0, x1, y1 = pts
+                start, extent, width = op[3], op[4], op[5]
+                rx, ry = (x1 - x0) / 2, (y1 - y0) / 2
+                if rx > 0 and ry > 0:
+                    cr.save()
+                    cr.translate(x0 + rx, y0 + ry)
+                    cr.scale(rx, ry)
+                    a0, a1 = -math.radians(start), -math.radians(start + extent)
+                    if extent >= 0:
+                        cr.arc_negative(0, 0, 1, a0, a1)
+                    else:
+                        cr.arc(0, 0, 1, a0, a1)
+                    cr.restore()
+                    cr.set_line_width(width or 1)
+                    cr.stroke()
             elif kind == "line":
                 cr.set_line_width(op[3] or 1)
                 cr.move_to(pts[0], pts[1])
@@ -225,32 +241,52 @@ class PetWindow:
         self.closed = True
 
 
+_RGB = {}                                        # fill string -> (r, g, b) in 0..1
+_SNAP = """
+set out {}
+foreach i [%(c)s find withtag %(tag)s] {
+    set f [%(c)s itemcget $i -fill]
+    if {$f eq ""} continue
+    set t [%(c)s type $i]
+    if {$t eq "text"} {
+        lappend out [list $t [%(c)s coords $i] $f [%(c)s itemcget $i -text] [%(c)s itemcget $i -font] [%(c)s itemcget $i -anchor]]
+    } elseif {$t eq "line"} {
+        lappend out [list $t [%(c)s coords $i] $f [%(c)s itemcget $i -width]]
+    } else {
+        lappend out [list $t [%(c)s coords $i] $f]
+    }
+}
+return $out
+"""
+
+
 def snapshot(canvas, root, tag="dyn"):
-    """The canvas items with a tag, as plain drawing commands for the GTK side."""
+    """The canvas items with a tag, as plain drawing commands for the GTK side. One Tcl
+    script gathers everything: asking item by item from Python cost a third of a core."""
+    tk = root.tk
     ops = []
-    for item in canvas.find_withtag(tag):
-        kind = canvas.type(item)
-        pts = canvas.coords(item)
-        fill = canvas.itemcget(item, "fill")
-        rgb = None
-        if fill:
+    for entry in tk.splitlist(tk.eval(_SNAP % {"c": canvas._w, "tag": tag})):
+        parts = tk.splitlist(entry)
+        kind, fill = parts[0], parts[2]
+        rgb = _RGB.get(fill)
+        if rgb is None:
             try:
                 r, g, b = root.winfo_rgb(fill)
                 rgb = (r / 65535, g / 65535, b / 65535)
             except Exception:
-                rgb = None
+                rgb = False
+            _RGB[fill] = rgb
+        if not rgb:
+            continue
+        pts = [float(v) for v in tk.splitlist(parts[1])]
         if kind in ("rectangle", "oval", "polygon"):
-            if rgb:
-                ops.append((kind, pts, rgb))
+            ops.append((kind, pts, rgb))
         elif kind == "line":
-            if rgb:
-                ops.append((kind, pts, rgb, float(canvas.itemcget(item, "width") or 1)))
+            ops.append((kind, pts, rgb, float(parts[3] or 1)))
         elif kind == "text":
-            if rgb:
-                font = root.tk.splitlist(canvas.itemcget(item, "font"))
-                family = font[0] if font else "sans"
-                size = abs(int(font[1])) if len(font) > 1 else 10
-                bold = "bold" in font[2:]
-                ops.append(("text", pts, rgb, canvas.itemcget(item, "text"), family, size, bold,
-                            canvas.itemcget(item, "anchor") or "center"))
+            font = tk.splitlist(parts[4])
+            family = font[0] if font else "sans"
+            size = abs(int(font[1])) if len(font) > 1 else 10
+            bold = "bold" in font[2:]
+            ops.append(("text", pts, rgb, parts[3], family, size, bold, parts[5] or "center"))
     return ops
