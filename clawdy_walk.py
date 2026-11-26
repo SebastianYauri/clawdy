@@ -291,9 +291,23 @@ def plain(kind, frame=0, look=0, blink=False, col=None):
     legs_x = [OX + 3, OX + 5, OX + 8, OX + 10]
     legs = [(lx, OY + 7, 1, 2, ORANGE_D) for lx in legs_x]
     arms = [(OX, OY + 3, 2, 2, ORANGE), (OX + 12, OY + 3, 2, 2, ORANGE)]
-    if kind == "walk":
-        up = (0, 2) if frame % 2 else (1, 3)
-        legs = [(lx, OY + 7, 1, 1 if i in up else 2, ORANGE_D) for i, lx in enumerate(legs_x)]
+    if kind in ("walk", "stomp"):
+        # a four-frame cycle: contact (all feet down, body low), pass (one pair up, body bobs
+        # up, arms swing), contact, pass with the other pair
+        f = frame % 4
+        passing = f % 2 == 1
+        up = () if not passing else ((0, 2) if f == 1 else (1, 3))
+        legs = [(lx, OY + 6 if passing else OY + 7, 1, (1 if i in up else 3) if passing else 2, ORANGE_D)
+                for i, lx in enumerate(legs_x)]
+        if passing:
+            R = [(OX + 2, OY - 1, 10, 7, ORANGE)]
+            eyes = [(x, y - 1, w, h, c) for x, y, w, h, c in eyes]
+        if kind == "walk":
+            swing = (0 if not passing else (-1 if f == 1 else 1))
+            arms = [(OX, OY + 3 + swing - (1 if passing else 0), 2, 2, ORANGE),
+                    (OX + 12, OY + 3 - swing - (1 if passing else 0), 2, 2, ORANGE)]
+        else:                                    # Frankenstein: stiff legs, arms straight out front
+            arms = [(OX, OY + (0 if passing else 1), 2, 3, ORANGE), (OX + 12, OY + (0 if passing else 1), 2, 3, ORANGE)]
     elif kind == "wave":
         arms = [arms[0], (OX + 12, OY + (0 if frame % 2 else 1), 2, 2, ORANGE)]
     elif kind == "hang":                      # both hands on the edge above
@@ -301,15 +315,18 @@ def plain(kind, frame=0, look=0, blink=False, col=None):
         arms = [(OX, a, 2, OY + 5 - a, ORANGE), (OX + 12, 1 - a, 2, OY + 4 + a, ORANGE)]
     elif kind == "hang1":                     # one hand on the edge, waving with the other
         arms = [(OX, 0, 2, OY + 5, ORANGE), (OX + 12, OY + (0 if frame % 2 else 1), 2, 2, ORANGE)]
-    elif kind == "stomp":                     # Frankenstein: stiff legs, arms straight out front
-        up = (0, 2) if frame % 2 else (1, 3)
-        legs = [(lx, OY + 7, 1, 1 if i in up else 2, ORANGE_D) for i, lx in enumerate(legs_x)]
-        arms = [(OX, OY + 1, 2, 3, ORANGE), (OX + 12, OY + 1, 2, 3, ORANGE)]
     elif kind == "broom":                     # riding: legs tucked, hands on the stick
         legs = [(lx, OY + 7, 1, 1, ORANGE_D) for lx in legs_x]
         arms = [(OX + 1, OY + 5, 2, 2, ORANGE), (OX + 11, OY + 5, 2, 2, ORANGE)]
-    elif kind == "hop":                       # pumpkin in the air: legs tucked
-        legs = [(lx, OY + 7, 1, 1, ORANGE_D) for lx in legs_x]
+    elif kind == "hop":                       # 0: crouch, 1: in the air (legs tucked), 2: landing squash
+        if frame in (0, 2):
+            R = [(OX + 1, OY + 1, 12, 6, ORANGE)]
+            eyes = [(x, y + 1, w, h, c) for x, y, w, h, c in eyes]
+            arms = [(OX - 1, OY + 4, 2, 2, ORANGE), (OX + 13, OY + 4, 2, 2, ORANGE)]
+            legs = [(lx, OY + 7, 1, 2, ORANGE_D) for lx in legs_x]
+        else:
+            legs = [(lx, OY + 7, 1, 1, ORANGE_D) for lx in legs_x]
+            arms = [(OX, OY + 2, 2, 2, ORANGE), (OX + 12, OY + 2, 2, 2, ORANGE)]
     elif kind in ("climb", "slide"):          # holding the rope in the middle
         a = frame % 2 if kind == "climb" else 0
         arms = [(OX + 5, a, 1, OY - a, ORANGE), (OX + 8, 1 - a if kind == "climb" else 0,
@@ -475,7 +492,7 @@ class Walk:
             return False
         name, dur = self.phases[self.i]
         q = (self.t - sum(d for _, d in self.phases[:self.i])) / dur if dur > 0 else 1.0
-        frame = int(self.t * 6)
+        frame = int(self.t * 8)
         {"floor": self.floor_step, "ceiling": self.ceiling_step, "fly": self.fly_step,
          "sleigh": self.sleigh_step}[self.mode](name, q, frame)
         return True
@@ -548,7 +565,8 @@ class Walk:
             self.draw("broom", x, y + swoop, lean=lean, extra=[(tx, ty, 1, 1, col) for tx, ty, col, _ in self.trail])
         else:                                    # pumpkin: bounces along
             hop = abs(math.sin(self.t * 4.2))
-            self.draw("hop" if hop > 0.25 else "stand", x, y - hop * 46 * k)
+            self.draw("hop" if hop > 0.25 else ("stand" if hop > 0.1 else "hop"), x, y - hop * 46 * k,
+                      1 if hop > 0.25 else 2)
 
     def alpha(self, a):
         try:
@@ -588,11 +606,11 @@ class Walk:
         if c == "tree":                          # hops as one piece
             q = (self.t * 2.4) % 1
             air = math.sin(q * math.pi)
-            self.draw("hop" if q < 0.85 else "stand", x, stand - air * 26 * k)
+            self.draw("hop", x, stand - air * 26 * k, 0 if q < 0.08 else (1 if q < 0.85 else 2))
         elif c == "snowman":                     # slides, rocking, no steps
             self.draw("stand", x, stand - abs(math.sin(self.t * 4)) * 2 * k, lean=math.sin(self.t * 4) * 0.5)
         elif c == "gingerbread":                 # runs for it
-            self.draw("walk", x, stand - abs(math.sin(self.t * 18)) * 3 * k, int(self.t * 12), lean=d * 0.6)
+            self.draw("walk", x, stand - abs(math.sin(self.t * 18)) * 3 * k, int(self.t * 16), lean=d * 0.6)
         else:
             self.draw("walk", x, stand, frame)
 

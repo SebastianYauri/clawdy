@@ -5,6 +5,10 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.6
 
+- **Smoother desktop walks.** Walking along the floor is a four-frame cycle now
+  (contact, pass with a bob and the arms swinging, contact, pass with the other
+  pair) instead of two feet alternating; hops have a crouch, the air and a
+  landing squash. Frankenstein's stomp and the pumpkin's bounces use them too.
 - **A shorter, tidier skin creator.** Presets, head, face, body and your own
   skins are tabs now, so the window fits on any screen (it used to grow past
   the bottom edge as parts were added). The hovered or worn part's name shows
