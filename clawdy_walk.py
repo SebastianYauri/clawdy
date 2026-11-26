@@ -253,7 +253,7 @@ def wear_from(widget):
     image is one Clawdy pixel, so they land exactly on the walking sprite."""
     import clawdy_character as character
     from clawdy_gui import BODY_CELLS
-    cells = set(BODY_CELLS)
+    cells = {(r // 2, c // 2) for r, c in BODY_CELLS}      # the walk's grid is one Clawdy pixel per cell
     ch = widget.character_now()
     skins = widget.skin_paths(ch)
     out, paint = [], {}

@@ -128,19 +128,14 @@ def split_skin(pix, cells):
     """A body part or whole skin becomes paint on the body and an overlay for the rest.
 
     `cells` are the (row, col) cells of Clawdy's sprite that make up its body, arms and legs;
-    each cell is 2×2 image pixels at (2 + 2*col, 12 + 2*row). Returns ({(row, col): [(dx, dy,
+    a cell is the image pixel at (2 + col, 12 + row). Returns ({(row, col): [(dx, dy,
     w, h, color)]} in sprite units inside the cell, [overlay runs]) — the paint moves with the
     limb it is on, the overlay (a hat brim, a cape, a tree's branches) stays put."""
     paint, rest = {}, dict(pix)
-    for r, c in cells:
-        subs = []
-        for j in range(2):
-            for i in range(2):
-                col = rest.pop((2 + 2 * c + i, 12 + 2 * r + j), None)
-                if col:
-                    subs.append((i * CELL, j * CELL, CELL, CELL, col))
-        if subs:
-            paint[(r, c)] = subs
+    for r, c in cells:                          # a cell is exactly one image pixel
+        col = rest.pop((2 + c, 12 + r), None)
+        if col:
+            paint[(r, c)] = [(0, 0, CELL, CELL, col)]
     return paint, merge_runs(rest)
 
 
@@ -197,9 +192,7 @@ def export_templates(widget, tk_module, sprite, colors, layer_paths, skins):
     for r, row in enumerate(sprite):
         for c, ch in enumerate(row):
             if ch in colors:
-                for dy in (0, 1):
-                    for dx in (0, 1):
-                        body[(2 + c * 2 + dx, 12 + r * 2 + dy)] = colors[ch]
+                body[(2 + c, 12 + r)] = colors[ch]
     write_png(tk_module, os.path.join(out, "_clawdy-reference.png"), body)
     look = {}
     for path in layer_paths:

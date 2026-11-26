@@ -5,6 +5,16 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.8
 
+- **A finer Clawdy.** The body is drawn at the costumes' resolution now (twice
+  the detail): a dark outline, a highlight along the top, shade along the
+  bottom, rounded corners, outlined arms and legs, and a glint in each eye.
+  Same size on screen; every costume lands on it pixel for pixel. A contact
+  shadow sits under it (translucent on the desktop in pet mode) and lifts when
+  it jumps.
+- **Motion with weight.** Landings are a damped spring instead of a frozen
+  squash, Clawdy leans into the direction it walks with a bounce in the body,
+  whatever sits on its head lags behind sudden moves and catches up, blinks
+  vary (sometimes a double one), and it draws at 60 fps while moving.
 - **A finer sleigh.** Santa's and the reindeer's sleigh flight is rendered at
   twice the detail with 12 frames: the reindeer gallop with their hooves
   lifting, heads nodding and tails flicking, bells bounce on the harness,

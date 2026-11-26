@@ -116,19 +116,31 @@ def hx(rgb, a=1.0):
 
 # ---------------------------------------------------------------- Clawd
 
-# X = body, E = eye, L = leg, A = arm
+# Half-pixel cells, the resolution of the costumes: X body, H highlight, S shade, x outline,
+# E eye, A arm, a arm outline, L leg, l leg outline. Same size on screen as the old 14×9 body.
 SPRITE = [
-    "..XXXXXXXXXX..",
-    "..XXXXXXXXXX..",
-    "..XXEXXXXEXX..",
-    "AAXXEXXXXEXXAA",
-    "AAXXXXXXXXXXAA",
-    "..XXXXXXXXXX..",
-    "..XXXXXXXXXX..",
-    "...L.L..L.L...",
-    "...L.L..L.L...",
+    "......xxxxxxxxxxxxxxxx......",
+    "....xxHHHHHHHHHHHHHHHHxx....",
+    "....xHHHHXXXXXXXXXXXXXXx....",
+    "....xHXXXXXXXXXXXXXXXXXx....",
+    "....xXXXEEXXXXXXXXEEXXXx....",
+    "aaaaxXXXEEXXXXXXXXEEXXXxaaaa",
+    "aAAAxXXXEEXXXXXXXXEEXXXxAAAa",
+    "aAAAxXXXEEXXXXXXXXEEXXXxAAAa",
+    "aAAAxXXXXXXXXXXXXXXXXXXxAAAa",
+    "aAAAxXXXXXXXXXXXXXXXXXXxAAAa",
+    "aaaaxXXXXXXXXXXXXXXXXXXxaaaa",
+    "....xSXXXXXXXXXXXXXXXXSx....",
+    "....xxSSSSSSSSSSSSSSSSxx....",
+    "......xxxxxxxxxxxxxxxx......",
+    ".....lLLllLLl..lLLllLLl.....",
+    ".....lLLllLLl..lLLllLLl.....",
+    ".....lLLllLLl..lLLllLLl.....",
+    ".....llllllll..llllllll.....",
 ]
-PX = 6
+assert all(len(r) == 28 for r in SPRITE)
+PX = 3
+LEG_COLS = ((5, 8), (9, 12), (15, 18), (19, 22))      # each leg with its outline
 SW, SH = len(SPRITE[0]) * PX, len(SPRITE) * PX
 
 
@@ -140,11 +152,18 @@ def _sprite_blocks():
     for r, row in enumerate(SPRITE):
         for c, ch in enumerate(row):
             if ch in "XE":
-                key = "body"
-            elif ch == "A":
-                key = "arm_l" if c < len(row) // 2 else "arm_r"
-            elif ch == "L":
-                key = "leg%d" % c
+                key = ("body", "body")
+            elif ch == "H":
+                key = ("body", "hi")
+            elif ch == "S":
+                key = ("body", "sh")
+            elif ch == "x":
+                key = ("body", "out")
+            elif ch in "Aa":
+                key = ("arm_l" if c < len(row) // 2 else "arm_r", "body" if ch == "A" else "out")
+            elif ch in "Ll":
+                leg = next(i for i, (a, b) in enumerate(LEG_COLS) if a <= c <= b)
+                key = ("leg%d" % leg, "leg" if ch == "L" else "out")
             else:
                 continue
             parts.setdefault(key, set()).add((r, c))
@@ -163,14 +182,25 @@ def _sprite_blocks():
             r0 = prev = rows[0]
             for r in rows[1:] + [None]:
                 if r != prev + 1:
-                    blocks.append((key, r0, c0, prev, c1))
+                    blocks.append((key[0], key[1], r0, c0, prev, c1))
                     r0 = r
                 prev = r
+    blocks.sort(key=lambda b: ("out", "body", "leg", "hi", "sh").index(b[1]))   # outline under, tones on top
     return blocks
 
 
+def _eyes():
+    """[(row, col)] of the top-left cell of each eye (an eye is 2×4 cells)."""
+    cells = [(r, c) for r, row in enumerate(SPRITE) for c, ch in enumerate(row) if ch == "E"]
+    out = []
+    for r, c in cells:
+        if (r - 1, c) not in cells and (r, c - 1) not in cells:
+            out.append((r, c))
+    return out
+
+
 BLOCKS = _sprite_blocks()
-EYES = [(r, c) for r, row in enumerate(SPRITE) for c, ch in enumerate(row) if ch == "E"]
+EYES = _eyes()
 BODY_CELLS = [(r, c) for r, row in enumerate(SPRITE) for c, ch in enumerate(row) if ch != "."]
 
 # idle routine, when Claude Code isn't doing anything
@@ -630,6 +660,8 @@ class Widget:
         self._pet_frame = None                      # the last frame handed to the GTK pet window
         self._rec = None                            # drawing commands being recorded for it (see rect())
         self._crashes = set()                       # frame exceptions already written to clawdy.log
+        self._palettes = {}                         # body colour -> sprite palette
+        self._motion = None                         # (pos, dy, time) of the last frame, for follow-through
         self._anchor = False                        # True while the Tk window is a 1-px anchor (GTK pet)
         self.col_in = self.panel_in = False
         self.left_at = 0.0
@@ -1127,6 +1159,21 @@ class Widget:
         lum = 0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2]
         eyes = DARK if lum > 0.35 else (0.96, 0.94, 0.90)
         return hx(rgb), hx(tuple(c * 0.82 for c in rgb)), hx(eyes)
+
+    def body_palette(self, ch=None):
+        """Tk colors per sprite role: body, hi (light), sh (shade), leg, out (outline), eye."""
+        rgb = character.color_rgb(ch or self.character_now())
+        key = tuple(rgb)
+        pal = self._palettes.get(key)
+        if pal is None:
+            lum = 0.3 * rgb[0] + 0.59 * rgb[1] + 0.11 * rgb[2]
+            hi = tuple(min(1.0, c + (1 - c) * 0.28) for c in rgb)
+            sh = tuple(c * 0.80 for c in rgb)
+            out = tuple(c * 0.34 for c in rgb)
+            pal = self._palettes[key] = {"body": hx(rgb), "hi": hx(hi), "sh": hx(sh), "leg": hx(sh),
+                                         "out": hx(out), "eye": hx(DARK if lum > 0.35 else (0.96, 0.94, 0.90)),
+                                         "glint": hx((1.0, 1.0, 1.0))}
+        return pal
 
     def hat_top(self, ch=None):
         """Sprite y of the highest pixel of what's on Clawdy's head (-27 = bare)."""
@@ -1631,8 +1678,9 @@ class Widget:
     def design_costumes(self):
         """Export a body reference and the current look as PNGs and open the folder to draw over them."""
         try:
-            body, legs, eyes = self.body_colors()
-            colors = {"X": body, "A": body, "L": legs, "E": eyes}
+            pal = self.body_palette()
+            colors = {"X": pal["body"], "A": pal["body"], "L": pal["leg"], "E": pal["eye"], "H": pal["hi"],
+                      "S": pal["sh"], "x": pal["out"], "a": pal["out"], "l": pal["out"]}
             ch = self.character_now()
             paths = character.layers(ch, "back") + character.layers(ch, "front")
             folder = clawdy_skins.export_templates(self, tk, SPRITE, colors, paths, self.skins)
@@ -2108,7 +2156,8 @@ class Widget:
             return
         except Exception as e:                  # a bug in one frame must not freeze the window
             self.crash(e)
-        busy = (0.0 < self.e < 1.0 or self.col_in or self.panel_in or self.target != self.e
+        moving = self.cur_act not in (None, "sleep", "look", "stand", "stretch") or self.walk or self.away
+        busy = (0.0 < self.e < 1.0 or self.col_in or self.panel_in or self.target != self.e or moving
                 or self.held or time.time() < max(self.dizzy_until, self.land_until))
         period = 1.0 / (FPS_FAST if busy else FPS)
         now = time.perf_counter()
@@ -2147,6 +2196,15 @@ class Widget:
             self._rec.append(("line", list(pts), rgb(color), width))
             return
         self.canvas.create_line(pts, fill=color, width=width)
+
+    def shadow(self, cx, cy, rx, ry, a):
+        """A soft contact shadow: blended with the card, or translucent on the desktop (pet)."""
+        if self._rec is not None:
+            self._rec.append(("oval", [cx - rx, cy - ry, cx + rx, cy + ry], (0.0, 0.0, 0.0, 0.55 * a)))
+            return
+        if self.pet:
+            return                                   # a shaped Tk window can't blend with the desktop
+        self.oval(cx, cy, rx, ry, hx((0, 0, 0), a))
 
     def arc(self, x0, y0, x1, y1, start, extent, color, width=1):
         """An open arc (Tk angles: degrees counter-clockwise from 3 o'clock)."""
@@ -2296,6 +2354,8 @@ class Widget:
             step = int(t * f / math.pi * 2) % 2
             sw = math.sin(t * f) * 3
             arm_l, arm_r = sw, -sw
+            rot = self.dir * 0.035                   # leans into the direction it walks
+            sy = 1 + 0.02 * math.sin(t * f * 2)      # a little bounce in the body
             if gait == "reindeer":               # a two-beat trot, antlers swaying
                 beat = math.sin(t * f * 0.7)
                 dy = -abs(beat) * 6
@@ -2363,8 +2423,10 @@ class Widget:
                 if act == "flip":
                     rot = self.dir * k * 2 * math.pi
                 self.landed = False
-            elif q < 0.9:
-                sy, sx = 0.85, 1.12
+            elif q < 0.9:                            # landing: a damped spring, not a frozen squash
+                u = (q - 0.75) / 0.15
+                sy = 1 - 0.15 * math.cos(u * 2.6) * math.exp(-u * 1.8)
+                sx = 1 + 0.12 * math.cos(u * 2.6) * math.exp(-u * 1.8)
                 if not self.landed:
                     self.landed = True
                     for i in range(7):
@@ -2920,8 +2982,10 @@ class Widget:
             self.spawn("puff", cx + self.pos + self.dir * 8, by - SH * 0.45, self.dir * 14, -8, 0.8)   # cold breath
             self.emit = 1.6
 
-        if eye == "open" and (t % 3.1) < 0.13:
-            eye = "closed"
+        if eye == "open":
+            ph = t % 4.3                               # blinks: now and then a double one
+            if ph < 0.11 or (0.26 < ph < 0.37 and int(t // 4.3) % 3 == 0):
+                eye = "closed"
         if panic and not work:
             self.pos += math.sin(t * 45) * 0.6
         if top >= 70 and not work and self.emit <= 0 and act not in ("dance", "wave", "sleep", "run"):
@@ -2941,8 +3005,17 @@ class Widget:
 
         bx = cx + self.pos
         k = max(0.3, 1 + dy / 60)
-        if not self.pet:                        # no card to cast a shadow on
-            self.oval(bx, by + 3, SW / 2 * k, 3.5, hx((0, 0, 0), 0.35 * k))
+        self.shadow(bx, by + 3, SW / 2 * k * sx, 3.5, 0.35 * k)   # contact shadow, lighter when airborne
+        # follow-through: whatever sits on the head lags behind sudden moves
+        if "head" not in self.part_fx and self._motion and not self.away:
+            ppos, pdy, pt = self._motion
+            el = max(1e-3, t - pt)
+            if el < 0.2:
+                vx, vy = (self.pos - ppos) / el, (dy - pdy) / el
+                lag = lambda v, m: max(-m, min(m, -v * 0.014))
+                if abs(vx) > 8 or abs(vy) > 8:
+                    self.part_fx["head"] = (lag(vx, 2.5), lag(vy, 2.0), max(-0.1, min(0.1, -vx * 0.0009)))
+        self._motion = (self.pos, dy, t)
 
         xf = Xform(bx, by + dy - SH / 2 * sy, sx, sy, rot)   # anchored at the feet
         if self.batform:
@@ -3118,46 +3191,48 @@ class Widget:
         return paint
 
     def draw_sprite(self, xf, arm_l, arm_r, eye, eye_dx, eye_dy, step, tuck, ch=None):
-        orange, orange_d, dark = self.body_colors(ch)
+        pal = self.body_palette(ch)
+        dark = pal["eye"]
         paint = self.body_paint(ch or self.character_now())
         x0, y0 = -SW / 2, -SH / 2
-        for key, r0, c0, r1, c1 in BLOCKS:
+        runs = []
+        for key, role, r0, c0, r1, c1 in BLOCKS:
             x, y = x0 + c0 * PX, y0 + r0 * PX
             w, h = (c1 - c0 + 1) * PX, (r1 - r0 + 1) * PX
-            color = orange
             if key.startswith("leg"):
-                if tuck or (step is not None and (c0 in (3, 8)) == bool(step)):
+                if tuck or (step is not None and (key in ("leg0", "leg2")) == bool(step)):
                     y -= 3
-                color = orange_d
             elif key == "arm_l":
                 y += arm_l
             elif key == "arm_r":
                 y += arm_r
-            self.px_rect(xf, x, y, color, w, h)
+            runs.append((x, y, w, h, pal[role]))
             if paint:
-                runs = []
                 for r in range(r0, r1 + 1):
                     for c in range(c0, c1 + 1):
                         for dx, dy, pw, ph, col in paint.get((r, c), ()):
                             runs.append((x + (c - c0) * PX + dx, y + (r - r0) * PX + dy, pw, ph, col))
-                self.blocks(xf, runs)
+        self.blocks(xf, runs)
 
+        E = 2 * PX                                   # an eye: one old cell wide, two tall
         for r, c in EYES:
             x, y = x0 + c * PX, y0 + r * PX
             ex = x + eye_dx
             if eye == "open":
-                self.px_rect(xf, ex, y + eye_dy, dark)
+                self.px_rect(xf, ex, y + eye_dy, dark, E, 2 * E)
+                self.px_rect(xf, ex + 1, y + eye_dy + 1, pal["glint"], 2, 2)       # a glint of light
             elif eye == "scared":
-                self.poly([xf.pt(ex - 1, y - 2), xf.pt(ex + PX + 1, y - 2),
-                           xf.pt(ex + PX + 1, y + PX), xf.pt(ex - 1, y + PX)], dark)
-            elif eye == "closed" and r == 3:
-                self.poly([xf.pt(x - 1, y + 3), xf.pt(x + PX + 1, y + 3),
-                           xf.pt(x + PX + 1, y + 5), xf.pt(x - 1, y + 5)], dark)
-            elif eye == "happy" and r == 2:            # ^ ^ eyes
+                self.poly([xf.pt(ex - 1, y - 2), xf.pt(ex + E + 1, y - 2),
+                           xf.pt(ex + E + 1, y + 2 * E + 2), xf.pt(ex - 1, y + 2 * E + 2)], dark)
+                self.px_rect(xf, ex + 1, y + 1, pal["glint"], 2, 2)
+            elif eye == "closed":
+                self.poly([xf.pt(x - 1, y + E + 3), xf.pt(x + E + 1, y + E + 3),
+                           xf.pt(x + E + 1, y + E + 5), xf.pt(x - 1, y + E + 5)], dark)
+            elif eye == "happy":                        # ^ ^ eyes
                 for ox, oy in ((-2, 5), (1, 2), (5, 5)):
                     self.poly([xf.pt(x + ox, y + oy), xf.pt(x + ox + 3, y + oy),
                                xf.pt(x + ox + 3, y + oy + 3), xf.pt(x + ox, y + oy + 3)], dark)
-            elif eye == "x" and r == 2:                 # X eyes
+            elif eye == "x":                            # X eyes
                 for ox, oy in ((0, 0), (4, 0), (2, 3), (0, 6), (4, 6)):
                     self.poly([xf.pt(x - 1 + ox, y + 1 + oy), xf.pt(x + 2 + ox, y + 1 + oy),
                                xf.pt(x + 2 + ox, y + 4 + oy), xf.pt(x - 1 + ox, y + 4 + oy)], dark)
@@ -4230,7 +4305,9 @@ class Welcome:
         for r, row in enumerate(SPRITE):
             for c, ch in enumerate(row):
                 if ch != ".":
-                    col = {"E": DARK, "L": ORANGE_D}.get(ch, ORANGE)
+                    col = {"E": DARK, "L": ORANGE_D, "S": ORANGE_D, "H": tuple(min(1, c + (1 - c) * 0.28) for c in ORANGE),
+                           "x": tuple(c * 0.34 for c in ORANGE), "a": tuple(c * 0.34 for c in ORANGE),
+                           "l": tuple(c * 0.34 for c in ORANGE)}.get(ch, ORANGE)
                     banner.create_rectangle(x0 + c * px, y0 + r * px, x0 + (c + 1) * px,
                                             y0 + (r + 1) * px, fill=hx(col), width=0)
 

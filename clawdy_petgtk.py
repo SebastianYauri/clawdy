@@ -113,7 +113,10 @@ class PetWindow:
         for op in self.frame[4]:
             kind, pts, fill = op[0], op[1], op[2]
             if fill:
-                cr.set_source_rgb(*fill)
+                if len(fill) == 4:
+                    cr.set_source_rgba(*fill)
+                else:
+                    cr.set_source_rgb(*fill)
             if kind == "rectangle":                     # pixel-aligned and crisp: no seams between blocks
                 x0, y0, x1, y1 = (round(v) for v in pts)
                 if x1 > x0 and y1 > y0:
