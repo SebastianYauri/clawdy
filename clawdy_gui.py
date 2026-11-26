@@ -3453,10 +3453,10 @@ class Widget:
                 self.rect(x + 0.5, y - 1.5, 1.5, 1.5, eye)
             elif k == "bubble":
                 self.oval(x, y, 3, 3, hx((0.45, 0.90, 0.40), a))
-            elif k == "glow":                               # a soft red halo (Rudolph)
-                r = q["r"] * (0.6 + 0.4 * a)
-                self.oval(x, y, r, r * 0.8, hx((1.0, 0.55, 0.50), a * 0.16))
-                self.oval(x, y, r * 0.55, r * 0.45, hx((1.0, 0.72, 0.65), a * 0.26))
+            elif k == "glow":                               # a warm halo around Rudolph's nose
+                r = q["r"] * (0.5 + 0.3 * a)
+                self.oval(x, y, r * 0.55, r * 0.5, hx((1.0, 0.62, 0.58), a * 0.55))
+                self.oval(x, y, r * 0.32, r * 0.3, hx((1.0, 0.82, 0.78), a * 0.8))
             elif k == "bauble":
                 self.oval(x, y, 4, 4, hx(q["col"], a))
                 self.oval(x - 1.3, y - 1.3, 1.3, 1.3, hx((1, 1, 1), a * 0.9))
