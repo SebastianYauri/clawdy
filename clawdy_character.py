@@ -8,11 +8,11 @@ import random
 import clawdy_system as cs
 
 SLOTS = ("head", "face", "body")
-PARTS = {"head": ["witch", "santa", "elf", "antlers", "tophat", "frank", "slick", "cowboy", "chef", "pirate",
-                  "astronaut", "ninja"],
-         "face": ["stitches", "fangs", "rednose", "carrot", "glasses", "eyepatch", "blush"],
+PARTS = {"head": ["witch", "santa", "elf", "antlers", "tophat", "caphelmet", "thorhelm", "doomhood", "frank",
+                  "slick", "cowboy", "chef", "pirate", "astronaut", "ninja"],
+         "face": ["stitches", "fangs", "rednose", "carrot", "scowl", "glasses", "eyepatch", "blush"],
          "body": ["cape", "bolts", "sheet", "pumpkin", "scarf", "snowcoat", "gingerbread", "tree", "sweater",
-                  "bandana"]}
+                  "ironsuit", "capsuit", "thorcape", "hulkpants", "spidersuit", "doomcape", "bandana"]}
 # body colors: (key, rgb 0-1). The first one is Clawdy's own.
 COLORS = [("orange", (0.851, 0.467, 0.341)), ("coral", (0.93, 0.42, 0.42)), ("gold", (0.93, 0.70, 0.25)),
           ("green", (0.33, 0.72, 0.50)), ("teal", (0.25, 0.65, 0.68)), ("sky", (0.40, 0.65, 0.92)),
@@ -24,13 +24,19 @@ PRESETS = {"none": {}, "witch": {"head": "witch"}, "pumpkin": {"body": "pumpkin"
            "elf": {"head": "elf", "body": "sweater"}, "reindeer": {"head": "antlers", "face": "rednose"},
            "snowman": {"head": "tophat", "face": "carrot", "body": "snowcoat"},
            "gingerbread": {"body": "gingerbread"}, "tree": {"body": "tree"},
+           "iron": {"body": "ironsuit"}, "captain": {"head": "caphelmet", "body": "capsuit"},
+           "thunder": {"head": "thorhelm", "body": "thorcape"},
+           "hulk": {"color": "green", "face": "scowl", "body": "hulkpants"},
+           "spidey": {"body": "spidersuit"}, "doom": {"head": "doomhood", "body": "doomcape"},
            "cowboy": {"head": "cowboy", "body": "bandana"}, "chef": {"head": "chef"},
            "pirate": {"head": "pirate", "face": "eyepatch"}, "astronaut": {"head": "astronaut"},
            "ninja": {"head": "ninja"}}
 PRESET_ORDER = ["none", "witch", "pumpkin", "ghost", "vampire", "frank", "santa", "elf", "reindeer",
-                "snowman", "gingerbread", "tree", "cowboy", "chef", "pirate", "astronaut", "ninja"]
+                "snowman", "gingerbread", "tree", "iron", "captain", "thunder", "hulk", "spidey", "doom",
+                "cowboy", "chef", "pirate", "astronaut", "ninja"]
 BEHAVES = ("ghost", "pumpkin", "witch", "vampire", "frank", "santa", "reindeer", "snowman",
-           "gingerbread", "tree", "elf")                     # presets with their own tricks
+           "gingerbread", "tree", "elf", "iron", "captain", "thunder", "hulk", "spidey", "doom")
+HEROES = ("iron", "captain", "thunder", "hulk", "spidey", "doom")
 XMAS = ("santa", "reindeer", "elf", "snowman", "gingerbread", "tree")   # the Christmas wardrobe, by day
 
 
@@ -66,7 +72,7 @@ def identity(ch):
         return "custom"
     for name in BEHAVES:                     # ghost and pumpkin first: whole-body looks
         p = PRESETS[name]
-        if all(ch.get(slot) == part for slot, part in p.items()):
+        if all(ch.get(slot) == part for slot, part in p.items() if slot in SLOTS):
             return name
     return "custom" if any(ch.get(s) for s in SLOTS) else "none"
 

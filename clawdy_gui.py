@@ -211,7 +211,8 @@ SPOOKY = ("witch", "pumpkin", "ghost", "vampire", "frank")
 COSTUME_ACTS = ["walk", "special", "jump", "look", "trick", "special", "spin", "trick", "stretch", "flip"]
 TRICKS = {"witch": "fly", "vampire": "bat", "ghost": "float", "pumpkin": "roll", "santa": "present",
           "frank": "zombie", "reindeer": "prance", "elf": "wrap", "snowman": "melt",
-          "gingerbread": "catchme", "tree": "lightshow"}
+          "gingerbread": "catchme", "tree": "lightshow", "iron": "repulsor", "captain": "shield",
+          "thunder": "lightning", "hulk": "smash", "spidey": "websling", "doom": "doomblast"}
 # Claude Code work props, in costume
 THEMED = {("witch", "bubble"): "crystal", ("witch", "laptop"): "spellbook", ("witch", "book"): "spellbook",
           ("witch", "hammer"): "cauldron", ("santa", "laptop"): "gift"}
@@ -227,7 +228,14 @@ PALETTES = {
     "snowman": [(0.96, 0.97, 1.0), (0.55, 0.80, 1.0), (1.0, 0.55, 0.16)],
     "gingerbread": [(0.75, 0.50, 0.25), (1.0, 1.0, 1.0), (1.0, 0.35, 0.55), (0.35, 0.80, 1.0)],
     "tree": [(0.18, 0.62, 0.31), (1.0, 0.29, 0.29), (1.0, 0.85, 0.35), (0.35, 0.80, 1.0)],
+    "iron": [(0.78, 0.14, 0.17), (0.95, 0.76, 0.31), (0.56, 0.91, 1.0)],
+    "captain": [(0.18, 0.36, 0.85), (1.0, 1.0, 1.0), (0.85, 0.19, 0.23)],
+    "thunder": [(0.79, 0.82, 0.88), (0.78, 0.14, 0.17), (1.0, 0.92, 0.45)],
+    "hulk": [(0.33, 0.72, 0.50), (0.48, 0.25, 0.71), (0.62, 0.38, 0.84)],
+    "spidey": [(0.82, 0.17, 0.21), (0.11, 0.25, 0.61), (1.0, 1.0, 1.0)],
+    "doom": [(0.18, 0.54, 0.29), (0.73, 0.76, 0.81), (0.31, 0.70, 0.42)],
 }
+BLUE_GLOW = (0.56, 0.91, 1.0)
 # how each costume walks: (speed, step rate) in the porthole; the branch in draw_clawd shapes the rest
 GAITS = {"reindeer": (60, 9), "elf": (70, 16), "snowman": (35, 4), "gingerbread": (40, 6), "tree": (38, 5),
          "santa": (42, 8)}
@@ -2570,12 +2578,176 @@ class Widget:
                     self.spawn("bauble", cx + self.pos + random.uniform(-SW / 2, SW / 2), by - SH * random.uniform(0.3, 0.9),
                                random.uniform(-30, 30), random.uniform(-40, 0), 1.0, col=random.choice(BAUBLES))
                     self.emit = 0.12
+            elif c == "iron":                   # the arc reactor charges up
+                dy = -abs(math.sin(t * 3)) * 3
+                arm_l = arm_r = 2
+                if self.emit <= 0:
+                    self.spawn("glow", cx + self.pos, by - SH * 0.3, 0, 0, 0.3, r=9 + 4 * math.sin(t * 10), col=BLUE_GLOW)
+                    self.spawn("star", cx + self.pos + random.uniform(-6, 6), by - SH * 0.3, random.uniform(-30, 30),
+                               random.uniform(-40, 10), 0.5, col=BLUE_GLOW)
+                    self.emit = 0.08
+            elif c == "captain":                # shield up
+                props.append("shield")
+                arm_l = -6
+                eye = "open"
+                eye_dx = self.dir * 2
+                if self.emit <= 0:
+                    self.spawn("star", cx + self.pos - SW / 2 - 14 + random.uniform(-6, 6), by - SH / 2 + random.uniform(-10, 10),
+                               random.uniform(-20, 20), random.uniform(-30, 0), 0.6, col=random.choice(PALETTES["captain"]))
+                    self.emit = 0.2
+            elif c == "thunder":                # spins the hammer
+                props.append("mjolnir")
+                self.hammer = t * 14
+                arm_r = -8
+                eye = "open"
+                if self.emit <= 0:
+                    self.spawn("spark", cx + self.pos + SW / 2 + random.uniform(-10, 24), by - SH - 10 + random.uniform(-12, 12),
+                               random.uniform(-50, 50), random.uniform(-40, 20), 0.4)
+                    self.emit = 0.06
+            elif c == "hulk":                   # flexes and roars
+                q = (p * 2) % 1
+                sx, sy = 1.16, 0.96
+                arm_l = arm_r = -9
+                eye = "scared" if q < 0.5 else "open"
+                self.pos += math.sin(t * 40) * (0.6 if q < 0.5 else 0)
+                if q < 0.06 and self.emit <= 0:
+                    self.spawn("roar", cx + self.pos, by - SH - 16, 0, -14, 1.1)
+                    self.emit = 0.5
+            elif c == "spidey":                 # thwip: a web shot to the side
+                q = (p * 2) % 1
+                arm_r = -3 if q < 0.3 else -6
+                sy = 0.92
+                eye = "open"
+                if 0.3 < q < 0.34 and self.emit <= 0:
+                    self.spawn("webline", cx + self.pos + SW / 2 - 2, by - SH / 2, 0, 0, 0.55, dx=90, dy=-40)
+                    self.spawn("thwip", cx + self.pos + SW / 2 + 10, by - SH - 8, 10, -16, 0.9)
+                    self.emit = 0.45
+            elif c == "doom":                   # DOOM!
+                q = (p * 2) % 1
+                arm_l = arm_r = -8 if q < 0.5 else -3
+                self.part_fx["body"] = (math.sin(t * 6) * 1.2, 0, math.sin(t * 6) * 0.04)   # the cape flares
+                if q < 0.08 and self.emit <= 0:
+                    self.spawn("doom", cx + self.pos, by - SH - 18, 0, -12, 1.3)
+                    self.emit = 0.5
+                if self.emit <= 0:
+                    self.spawn("star", cx + self.pos + random.choice((-1, 1)) * (SW / 2 + 8), by - SH / 2 + random.uniform(-8, 8),
+                               random.uniform(-20, 20), random.uniform(-50, -10), 0.6, col=(0.31, 0.90, 0.42))
+                    self.emit = 0.12
             else:                               # no costume: wave
                 arm_r = -9 + math.sin(t * 16) * 4
                 eye = "happy"
                 if self.emit <= 0:
                     self.spawn("heart", cx + self.pos + SW / 2, by - SH, 15, -30, 1.4)
                     self.emit = 0.7
+
+        # --- the heroes' tricks ---
+        elif act == "repulsor":                  # Iron: lifts off on the repulsors and hovers about
+            lift = min(1.0, p / 0.18)
+            dy = -lift * 26 - math.sin(t * 2.2) * 4
+            self.pos = math.sin(t * 1.1) * 11 * lift
+            rot = -math.cos(t * 1.1) * 0.08 * lift
+            arm_l = arm_r = 3                    # palms down
+            tuck = True
+            eye = "open"
+            if self.emit <= 0 and lift > 0.2:
+                for d in (-1, 1):
+                    self.spawn("star", cx + self.pos + d * (SW / 2 - 6), by + dy + 2, random.uniform(-12, 12),
+                               random.uniform(50, 90), 0.3, col=BLUE_GLOW)
+                self.spawn("glow", cx + self.pos, by + dy + 4, 0, 0, 0.2, r=16, col=BLUE_GLOW)
+                self.emit = 0.04
+        elif act == "shield":                    # Captain: throws the shield and catches it
+            q = p
+            if q < 0.22:                         # wind-up
+                arm_l = -8
+                rot = -self.dir * 0.12 * (q / 0.22)
+                props.append("shield")
+                eye = "open"
+                eye_dx = self.dir * 2.5
+            elif q < 0.85:                       # away and back
+                u = (q - 0.22) / 0.63
+                if u < 0.02 and self.emit <= 0:
+                    hx_, hy_ = cx + self.pos - SW / 2, by - SH / 2
+                    self.spawn("disc", hx_, hy_, 0, 0, 1.5, x0=hx_, y0=hy_, dir=-1)
+                    self.emit = 0.4
+                arm_l = -3 + 5 * math.sin(u * math.pi)
+                rot = self.dir * 0.06 * math.sin(u * math.pi)
+                eye_dx = self.dir * 2.5
+            else:                                # caught
+                props.append("shield")
+                arm_l = -6
+                eye = "happy"
+                dy = -abs(math.sin(t * 6)) * 2
+        elif act == "lightning":                 # Thunder: raises the hammer, lightning answers
+            q = p
+            props.append("mjolnir")
+            self.hammer = -0.3 + 0.3 * math.sin(t * 2) if q > 0.3 else 0.8 - 1.1 * (q / 0.3)
+            arm_r = -9 if q > 0.25 else -9 * (q / 0.25)
+            eye = "open" if q < 0.3 else "scared"
+            self.part_fx["body"] = (math.sin(t * 7) * 0.8, 0, 0)
+            if q > 0.3 and self.emit <= 0:
+                if random.random() < 0.45:
+                    self.spawn("bolt", cx + self.pos + SW / 2 + 12, by - SH - 34, 0, 0, 0.18)
+                for _ in range(2):
+                    self.spawn("spark", cx + self.pos + SW / 2 + 12 + random.uniform(-10, 10), by - SH - 30,
+                               random.uniform(-70, 70), random.uniform(-40, 40), 0.35)
+                self.emit = 0.09
+        elif act == "smash":                     # Hulk: leaps and slams the ground
+            q = p
+            if q < 0.2:                          # crouch
+                sy, sx = 1 - 0.2 * (q / 0.2), 1 + 0.15 * (q / 0.2)
+                eye = "scared"
+            elif q < 0.55:                       # up
+                u = (q - 0.2) / 0.35
+                dy = -math.sin(u * math.pi) * 48 * HOP
+                sy, sx = 1.08, 0.94
+                arm_l = arm_r = -9
+                tuck = True
+                eye = "scared"
+            elif q < 0.72:                       # the slam
+                u = (q - 0.55) / 0.17
+                sy, sx = 0.76 + 0.24 * u, 1.24 - 0.24 * u
+                self.pos += math.sin(t * 60) * 2.5 * (1 - u)
+                arm_l = arm_r = 3
+                eye = "scared"
+                if u < 0.08 and self.emit <= 0:
+                    for i in range(14):
+                        a = math.pi + i * math.pi / 13
+                        self.spawn("dust", cx + self.pos + math.cos(a) * 20, by - 2, math.cos(a) * 110, math.sin(a) * 30 - 10, 0.7)
+                    for i in range(8):
+                        self.spawn("spark", cx + self.pos + random.uniform(-30, 30), by - 4, random.uniform(-80, 80),
+                                   random.uniform(-90, -20), 0.6)
+                    self.emit = 0.3
+            else:                                # stands tall
+                arm_l = arm_r = -9
+                sx = 1.1
+                eye = "open"
+        elif act == "websling":                  # Spidey: swings on a web from above
+            ax, ay = 8, -SH - 16                 # the anchor, up and a little to the right of home
+            L = 30
+            th = math.sin(t * 2.4) * 0.7
+            self.pos = ax + math.sin(th) * L
+            dy = ay + math.cos(th) * L + SH * 0.1
+            rot = -th * 0.45
+            tuck = True
+            arm_r = -9
+            eye = "happy"
+            self.spawn("webline", cx + self.pos + 6, by + dy - SH + 4, 0, 0, 0.05,
+                       dx=cx + ax - (cx + self.pos + 6), dy=by + ay - (by + dy - SH + 4), abs_=True)
+        elif act == "doomblast":                 # Doom: twin blasts of green energy
+            q = p
+            arm_l = arm_r = -5 if q > 0.15 else -5 * (q / 0.15)
+            self.part_fx["body"] = (math.sin(t * 9) * 1.4, 0, math.sin(t * 9) * 0.05)
+            eye = "open"
+            if q > 0.15 and self.emit <= 0:
+                for d in (-1, 1):
+                    self.spawn("star", cx + self.pos + d * (SW / 2 + 4), by - SH / 2 - 2, d * random.uniform(90, 150),
+                               random.uniform(-25, 25), 0.55, col=random.choice(((0.31, 0.90, 0.42), (0.75, 1.0, 0.8))))
+                self.emit = 0.03
+            if 0.48 < q < 0.52 and self.emit > -1 and not getattr(self, "_doom_said", False):
+                self.spawn("doom", cx + self.pos, by - SH - 18, 0, -12, 1.3)
+                self._doom_said = True
+            if q < 0.1:
+                self._doom_said = False
 
         elif act == "prance":                    # reindeer: a canter with bells, nose aglow
             beat = (t * 2.2) % 1                 # two quick hops and a breath
@@ -3391,6 +3563,24 @@ class Widget:
                 self.rect(bx - 24, by - 26, 48, 18, hx((0.55, 0.56, 0.60)))
                 self.oval(bx, by - 17, 3, 3, hx((0.60, 0.85, 1.0), 0.5 + 0.5 * abs(math.sin(t * 3))))
                 self.rect(bx - 28, by - 8, 56, 5, hx((0.40, 0.41, 0.45)))
+            elif pr == "shield":                            # on the left arm
+                sx_, sy_ = bx - SW / 2 - 6, bt + 22
+                for rr, col in ((13, (0.85, 0.19, 0.23)), (10, (1, 1, 1)), (7, (0.85, 0.19, 0.23)), (4.5, (0.18, 0.36, 0.85))):
+                    self.oval(sx_, sy_, rr, rr, hx(col))
+                pts = []
+                for i in range(10):
+                    a = -math.pi / 2 + i * math.pi / 5
+                    r_ = 4 if i % 2 == 0 else 1.7
+                    pts.append((sx_ + math.cos(a) * r_, sy_ + math.sin(a) * r_))
+                self.poly(pts, hx((1, 1, 1)))
+            elif pr == "mjolnir":                           # in the right hand, angle self.hammer
+                hx0, hy0 = bx + SW / 2 - 4, bt + 22 + arm_r
+                th = self.hammer
+                ex, ey = hx0 + math.sin(th) * 26, hy0 - math.cos(th) * 26
+                self.line((hx0, hy0, ex, ey), hx((0.45, 0.30, 0.18)), self.lw(3))
+                hd = Xform(ex, ey, 1, 1, th)
+                self.poly([hd.pt(-11, -7), hd.pt(11, -7), hd.pt(11, 6), hd.pt(-11, 6)], hx((0.62, 0.66, 0.74)))
+                self.poly([hd.pt(-11, -7), hd.pt(11, -7), hd.pt(11, -3), hd.pt(-11, -3)], hx((0.80, 0.84, 0.90)))
             elif pr == "hammer":
                 self.rect(bx + SW / 2 + 12, by - 8, 20, 8, hx((0.45, 0.45, 0.48)))
                 hx0, hy0 = bx + SW / 2 - 4, bt + 22 + arm_r
@@ -3497,6 +3687,10 @@ class Widget:
             q["y"] += q["vy"] * dt
             if q["k"] in ("spark", "drop", "conf", "fw", "bauble", "crumb"):
                 q["vy"] += 120 * dt
+            if q["k"] == "disc":                             # the shield: out, around and back
+                u = 1 - q["life"] / q["max"]
+                q["x"] = q["x0"] + q["dir"] * math.sin(u * math.pi) * 74
+                q["y"] = q["y0"] - math.sin(u * math.pi) * 26 - math.sin(u * 2 * math.pi) * 8
             a = q["life"] / q["max"]
             if self.pet and a < 0.4:          # no card behind: a faded particle would be a dark speck
                 continue
@@ -3528,10 +3722,28 @@ class Widget:
                 self.rect(x + 0.5, y - 1.5, 1.5, 1.5, eye)
             elif k == "bubble":
                 self.oval(x, y, 3, 3, hx((0.45, 0.90, 0.40), a))
-            elif k == "glow":                               # a warm halo around Rudolph's nose
+            elif k == "glow":                               # a warm halo (Rudolph's nose, a reactor)
                 r = q["r"] * (0.5 + 0.3 * a)
-                self.oval(x, y, r * 0.55, r * 0.5, hx((1.0, 0.62, 0.58), a * 0.55))
-                self.oval(x, y, r * 0.32, r * 0.3, hx((1.0, 0.82, 0.78), a * 0.8))
+                col = q.get("col") or (1.0, 0.62, 0.58)
+                self.oval(x, y, r * 0.55, r * 0.5, hx(col, a * 0.55))
+                self.oval(x, y, r * 0.32, r * 0.3, hx(tuple(min(1, c_ + 0.2) for c_ in col), a * 0.8))
+            elif k == "disc":                               # the shield in flight
+                sf = Xform(x, y, 1, 1, t * 14)
+                for rr, col in ((9, (0.85, 0.19, 0.23)), (7, (1, 1, 1)), (5, (0.85, 0.19, 0.23)), (3, (0.18, 0.36, 0.85))):
+                    self.oval(x, y, rr, rr, hx(col))
+                self.poly([sf.pt(0, -2.6), sf.pt(2.5, 2), sf.pt(-2.5, 2)], hx((1, 1, 1)))
+            elif k == "bolt":                               # a lightning bolt from above
+                pts = [(x, y - 70)]
+                for i in range(1, 7):
+                    pts.append((x + random.uniform(-9, 9) * (1 if i < 6 else 0), y - 70 + i * 70 / 6))
+                flat = [v for pt_ in pts for v in pt_]
+                self.line(flat, hx((1.0, 0.98, 0.75)), self.lw(2.5))
+                self.line(flat, hx((1.0, 1.0, 1.0)), self.lw(1))
+            elif k == "webline":                            # a strand of web
+                if q.get("abs_"):
+                    self.line((x, y, x + q["dx"], y + q["dy"]), hx((0.92, 0.92, 0.95), a), self.lw(1.2))
+                else:
+                    self.line((x, y, x + q["dx"] * (1 - a), y + q["dy"] * (1 - a)), hx((0.92, 0.92, 0.95), a), self.lw(1.2))
             elif k == "bauble":
                 self.oval(x, y, 4, 4, hx(q["col"], a))
                 self.oval(x - 1.3, y - 1.3, 1.3, 1.3, hx((1, 1, 1), a * 0.9))
@@ -3563,9 +3775,12 @@ class Widget:
                                     "?": ("?", TXT, 15),
                                     "dots": ("…", TXT, 15),
                                     "boo": (tr("say.boo"), (0.97, 0.97, 1.0), 16),
-                                    "jo": (tr("say.ho"), (1.0, 1.0, 1.0), 13)}[k]
+                                    "jo": (tr("say.ho"), (1.0, 1.0, 1.0), 13),
+                                    "doom": ("DOOM!", (0.40, 0.95, 0.50), 15),
+                                    "roar": ("RAAH!", (0.55, 0.95, 0.60), 15),
+                                    "thwip": ("thwip", (0.95, 0.95, 1.0), 11)}[k]
                 tx = x + math.sin(t * 4 + y) * 3
-                if k in ("boo", "jo"):              # dark outline: readable on anything
+                if k in ("boo", "jo", "doom", "roar"):   # dark outline: readable on anything
                     for ox, oy in ((-2, 0), (2, 0), (0, -2), (0, 2)):
                         self.text(tx + ox, y + oy, glyph, hx((0.10, 0.08, 0.08), a), size, bold=True,
                                   anchor="center")

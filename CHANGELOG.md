@@ -5,6 +5,17 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.8
 
+- **Six heroes for the Doomsday season.** Presets Iron (red and gold suit,
+  glowing eye slits, arc reactor), Captain (winged helmet, star suit, striped
+  boots), Thunder (winged helm, chest plates, a red cape behind), Hulk (green,
+  heavy brows, torn purple shorts), Spidey (mask with the big white eyes and
+  the web, blue legs) and Doom (green hood, steel mask with the eyes showing
+  through, green cape). Each has its trick: Iron lifts off on blue repulsors
+  and hovers about; Captain throws the shield, it arcs away and comes back to
+  the hand; Thunder raises the hammer and lightning answers; Hulk leaps and
+  slams the ground (dust, shake); Spidey swings on a web; Doom fires twin green
+  blasts with a "DOOM!". And their specials: the reactor charging, shield up,
+  hammer spinning, a flex and a roar, a web shot ("thwip"), the cape flaring.
 - **A finer Clawdy.** The body is drawn at the costumes' resolution now (twice
   the detail): a dark outline, a highlight along the top, shade along the
   bottom, rounded corners, outlined arms and legs, and a glint in each eye.
