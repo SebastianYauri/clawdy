@@ -5,6 +5,10 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.6
 
+- **A shorter, tidier skin creator.** Presets, head, face, body and your own
+  skins are tabs now, so the window fits on any screen (it used to grow past
+  the bottom edge as parts were added). The hovered or worn part's name shows
+  next to the group's title.
 - **Costumes are worn, not laid on top.** A body part (or a whole skin) now paints
   Clawdy's body, arms and legs cell by cell, so a raised arm keeps its sleeve
   and a step moves the sock: no second body peeking out underneath. Only what

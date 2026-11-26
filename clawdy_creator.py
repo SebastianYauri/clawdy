@@ -25,6 +25,7 @@ class Creator:
         self.closed, self.hover, self.hits = False, None, []
         self.flash_text, self.flash_until = "", 0.0
         self.t0, self.pop_at = time.time(), -1.0
+        self.tab = "presets"                 # one group of tiles at a time keeps the window short
         self.win = tk.Toplevel(w.root)
         self.h = self.layout_height()
         pw, ph = round(MW * self.k), round(self.h * self.k)
@@ -46,19 +47,29 @@ class Creator:
         self.win.after(120, self.tick)
 
     # -------- layout --------
+    def tabs(self):
+        out = ["presets"] + list(character.SLOTS)
+        if character.user_skins():
+            out.append("skin")
+        return out
+
     def rows(self):
-        """[(kind, label, y)] top to bottom, in units."""
+        """[(kind, label, y)] top to bottom, in units: colour, the tabs, one tab's tiles, buttons."""
         y = 34 + PREVIEW_H + 12
         out = [("color", tr("creator.color"), y)]
         y += 36
-        for slot in character.SLOTS:
-            out.append((slot, tr("creator." + slot), y))
-            y += 18 + self.tile_rows(len(character.PARTS[slot]) + 1) * GAP + 7
-        if character.user_skins():
-            out.append(("skin", tr("creator.mine"), y))
-            y += 18 + self.tile_rows(len(character.user_skins()) + 1) * GAP + 7
-        out.append(("presets", tr("creator.presets"), y))
-        y += 18 + 3 * 24 + 8
+        out.append(("tabs", "", y))
+        y += 30
+        if self.tab not in self.tabs():
+            self.tab = "presets"
+        if self.tab == "presets":
+            n = len(character.PRESET_ORDER) + 1
+            out.append(("presets", tr("creator.presets"), y))
+            y += 18 + ((n + 4) // 5) * 24 + 8
+        else:
+            n = len(character.PARTS[self.tab]) + 1 if self.tab != "skin" else len(character.user_skins()) + 1
+            out.append((self.tab, tr("creator." + ("mine" if self.tab == "skin" else self.tab)), y))
+            y += 18 + self.tile_rows(n) * GAP + 7
         out.append(("buttons", "", y))
         return out
 
@@ -104,6 +115,20 @@ class Creator:
                 for i, (text, fn) in enumerate(labels):
                     self.button(PAD + i * (bw + 6), y, bw, 22, text, fn)
                 continue
+            if kind == "tabs":
+                names = self.tabs()
+                tw = (MW - 2 * PAD - (len(names) - 1) * 5) / len(names)
+                for i, name in enumerate(names):
+                    text = tr("creator." + ("mine" if name == "skin" else name))
+                    self.pill(PAD + i * (tw + 5), y, tw, 22, text, name == self.tab, lambda name=name: self.show(name))
+                continue
+            if kind in character.SLOTS or kind == "skin":        # the hovered (else the worn) part's name
+                hov = self.hover if isinstance(self.hover, tuple) and self.hover[0] == kind else None
+                pick = hov[1] if hov else ch.get(kind)
+                if pick:
+                    label += "  ·  " + (pick if kind == "skin" else tr("part." + pick))
+                else:
+                    label += "  ·  " + tr("creator.none")
             c.create_text(S(PAD), S(y + 6), text=label, anchor="w", fill=hx(self.DIM), font=font(7, True))
             if kind == "color":
                 for i, (key, rgb) in enumerate(character.COLORS):
@@ -218,6 +243,11 @@ class Creator:
             self.hover = tag
             self.draw()
 
+    def show(self, tab):
+        self.tab = tab
+        self.hover = None
+        self.refit()
+
     def on_motion(self, ev):
         fn, tag = self.find(ev)
         self.set_hover(tag if fn else None)
@@ -229,6 +259,7 @@ class Creator:
 
     def set(self, slot, value):
         ch = dict(self.w.character_now())
+        self.pop_at = time.time()
         if slot == "skin":
             ch["skin"] = None if ch.get("skin") == value else value
         elif slot == "color":
