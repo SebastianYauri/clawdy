@@ -143,7 +143,7 @@ STRINGS = {
     "part.caphelmet": ("Winged helmet", "Casco alado"), "part.thorhelm": ("Thunder helm", "Yelmo del trueno"),
     "part.doomhood": ("Hood and mask", "Capucha y máscara"), "part.scowl": ("Scowl", "Ceño"),
     "part.ironsuit": ("Iron suit", "Armadura"), "part.capsuit": ("Star suit", "Traje de la estrella"),
-    "part.thorcape": ("Cape and plates", "Capa y placas"), "part.hulkpants": ("Torn shorts", "Pantalón roto"),
+    "part.thorcape": ("Cape and plates", "Capa y placas"), "part.hulkbody": ("Muscles and shorts", "Músculos y pantalón"),
     "part.spidersuit": ("Web suit", "Traje de araña"), "part.doomcape": ("Green cape", "Capa verde"),
     "costume.cowboy": ("Cowboy", "Vaquero"),
     "costume.chef": ("Chef", "Chef"),

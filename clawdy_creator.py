@@ -316,7 +316,7 @@ class Creator:
         if slot == "skin":
             ch["skin"] = None if ch.get("skin") == value else value
         elif slot == "color":
-            ch["color"] = value
+            ch["color"], ch["color_preset"] = value, False
         else:
             ch["skin"] = None
             ch[slot] = value
@@ -326,7 +326,9 @@ class Creator:
         if name == "auto":
             self.w.set_costume("auto")
         else:
-            self.apply(character.preset(name, self.w.character["color"]))
+            cur = self.w.character
+            base = "orange" if cur.get("color_preset") else cur["color"]   # a preset's own colour doesn't stick
+            self.apply(character.preset(name, base))
         self.refit()
 
     def random(self):

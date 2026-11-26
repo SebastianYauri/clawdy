@@ -12,7 +12,7 @@ PARTS = {"head": ["witch", "santa", "elf", "antlers", "tophat", "caphelmet", "th
                   "slick", "cowboy", "chef", "pirate", "astronaut", "ninja"],
          "face": ["stitches", "fangs", "rednose", "carrot", "scowl", "glasses", "eyepatch", "blush"],
          "body": ["cape", "bolts", "sheet", "pumpkin", "scarf", "snowcoat", "gingerbread", "tree", "sweater",
-                  "ironsuit", "capsuit", "thorcape", "hulkpants", "spidersuit", "doomcape", "bandana"]}
+                  "ironsuit", "capsuit", "thorcape", "hulkbody", "spidersuit", "doomcape", "bandana"]}
 # body colors: (key, rgb 0-1). The first one is Clawdy's own.
 COLORS = [("orange", (0.851, 0.467, 0.341)), ("coral", (0.93, 0.42, 0.42)), ("gold", (0.93, 0.70, 0.25)),
           ("green", (0.33, 0.72, 0.50)), ("teal", (0.25, 0.65, 0.68)), ("sky", (0.40, 0.65, 0.92)),
@@ -26,7 +26,7 @@ PRESETS = {"none": {}, "witch": {"head": "witch"}, "pumpkin": {"body": "pumpkin"
            "gingerbread": {"body": "gingerbread"}, "tree": {"body": "tree"},
            "iron": {"body": "ironsuit"}, "captain": {"head": "caphelmet", "body": "capsuit"},
            "thunder": {"head": "thorhelm", "body": "thorcape"},
-           "hulk": {"color": "green", "face": "scowl", "body": "hulkpants"},
+           "hulk": {"color": "green", "face": "scowl", "body": "hulkbody"},
            "spidey": {"body": "spidersuit"}, "doom": {"head": "doomhood", "body": "doomcape"},
            "cowboy": {"head": "cowboy", "body": "bandana"}, "chef": {"head": "chef"},
            "pirate": {"head": "pirate", "face": "eyepatch"}, "astronaut": {"head": "astronaut"},
@@ -43,7 +43,7 @@ XMAS = ("santa", "reindeer", "elf", "snowman", "gingerbread", "tree")   # the Ch
 def load(cfg=None):
     cfg = cfg if cfg is not None else cs.load_config()
     ch = cfg.get("character") or {}
-    out = {"color": ch.get("color") or "orange", "skin": ch.get("skin")}
+    out = {"color": ch.get("color") or "orange", "skin": ch.get("skin"), "color_preset": bool(ch.get("color_preset"))}
     for slot in SLOTS:
         v = ch.get(slot)
         out[slot] = v if v in PARTS[slot] else None
@@ -53,7 +53,7 @@ def load(cfg=None):
 
 
 def save(ch):
-    cs.update_config(character={k: ch.get(k) for k in ("color", "skin") + SLOTS})
+    cs.update_config(character={k: ch.get(k) for k in ("color", "skin", "color_preset") + SLOTS})
 
 
 def color_rgb(ch):
@@ -61,8 +61,10 @@ def color_rgb(ch):
 
 
 def preset(name, color="orange"):
-    ch = {"color": color, "skin": None, "head": None, "face": None, "body": None}
+    ch = {"color": color, "skin": None, "head": None, "face": None, "body": None, "color_preset": False}
     ch.update(PRESETS.get(name, {}))
+    if "color" in PRESETS.get(name, {}):
+        ch["color_preset"] = True                # Hulk's green: leaves with the preset
     return ch
 
 
