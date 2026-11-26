@@ -214,16 +214,48 @@ def pose(kind, frame=0, look=0, blink=False, costume="none", col=None, wear=((),
         return bat(frame, blink)
     if kind in ("ghost", "boo"):
         return ghost(frame, kind == "boo", blink, look)
-    back, front = wear
-    return list(back) + plain(kind, frame, look, blink, col) + list(front) + (broom() if kind == "broom" else [])
+    back, front = wear[0], wear[1]
+    paint = wear[2] if len(wear) > 2 else None
+    return (list(back) + painted(plain(kind, frame, look, blink, col), paint, col) + list(front)
+            + (broom() if kind == "broom" else []))
+
+
+def painted(rects, paint, col=None):
+    """Body, arm and leg rectangles take the costume's colours cell by cell (looked up at the
+    limb's rest position, so a raised arm keeps its sleeve)."""
+    if not paint:
+        return rects
+    body, body_d = (col or (ORANGE, ORANGE_D))[:2]
+    out = []
+    for x, y, w, h, c in rects:
+        if c == body_d and w == 1:                                                         # a leg
+            rest_y = lambda cy: min(max(cy, OY + 7), OY + 8)
+            rest_x = lambda cx: cx
+        elif c == body and (w, h) != (10, 7):                                              # an arm
+            left = x < OX + 6
+            rest_x = (lambda cx: min(max(cx, OX), OX + 1)) if left else (lambda cx: min(max(cx, OX + 12), OX + 13))
+            rest_y = lambda cy: min(max(cy, OY + 3), OY + 4)
+        elif c == body:                                                                    # the body
+            rest_x = lambda cx: cx
+            rest_y = lambda cy: cy
+        else:
+            out.append((x, y, w, h, c))
+            continue
+        for cy in range(y, y + h):
+            for cx in range(x, x + w):
+                out.append((cx, cy, 1, 1, paint.get((rest_x(cx), rest_y(cy)), c)))
+    return out
 
 
 def wear_from(widget):
     """The character's parts as grid rectangles: every 2×2 block of a 32×32 part
     image is one Clawdy pixel, so they land exactly on the walking sprite."""
     import clawdy_character as character
+    from clawdy_gui import BODY_CELLS
+    cells = set(BODY_CELLS)
     ch = widget.character_now()
-    out = []
+    skins = widget.skin_paths(ch)
+    out, paint = [], {}
     for layer in ("back", "front"):
         rects = []
         for path in character.layers(ch, layer):
@@ -231,13 +263,19 @@ def wear_from(widget):
                 pix = widget.skins.pixels(path)
             except Exception:
                 continue
+            on_body = layer == "front" and path in skins
             for (sx, sy), colr in pix.items():
                 if sx % 2 or sy % 2:
                     continue                           # one sample per Clawdy pixel
                 x, y = OX + (sx - 2) // 2, OY + (sy - 12) // 2
-                if 0 <= x < GW and 0 <= y < GH:
+                if not (0 <= x < GW and 0 <= y < GH):
+                    continue
+                if on_body and (y - OY, x - OX) in cells:
+                    paint[(x, y)] = colr               # moves with the limb
+                else:
                     rects.append((x, y, 1, 1, colr))
         out.append(rects)
+    out.append(paint)
     return tuple(out)
 
 

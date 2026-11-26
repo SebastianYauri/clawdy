@@ -171,6 +171,7 @@ def _sprite_blocks():
 
 BLOCKS = _sprite_blocks()
 EYES = [(r, c) for r, row in enumerate(SPRITE) for c, ch in enumerate(row) if ch == "E"]
+BODY_CELLS = [(r, c) for r, row in enumerate(SPRITE) for c, ch in enumerate(row) if ch != "."]
 
 # idle routine, when Claude Code isn't doing anything
 ACTS = ["walk", "jump", "wave", "walk", "look", "spin", "dance", "special", "walk", "stretch", "flip"]
@@ -3069,8 +3070,27 @@ class Widget:
         self.oval(x, y, 2.5, 2.5, hx((0.97, 0.95, 0.92), a))
         self.oval(x - r * 0.4, y - r * 0.45, 2.5, 2, hx((1, 1, 1), 0.8 * a))
 
+    def skin_paths(self, ch):
+        """The images painted onto the body itself: the body part, then a whole skin on top."""
+        out = []
+        if ch.get("body"):
+            out.append(character.part_now("body", ch["body"]))
+        if ch.get("skin"):
+            out.append(os.path.join(character.skins_folder(), ch["skin"] + ".png"))
+        return out
+
+    def body_paint(self, ch):
+        """{(row, col): [(dx, dy, w, h, color)]}: the costume's pixels that sit on Clawdy's body,
+        arms and legs, so they move with them (no second body showing underneath)."""
+        paint = {}
+        for path in self.skin_paths(ch):
+            for cell, subs in self.skins.skin(path, BODY_CELLS)[0].items():
+                paint.setdefault(cell, []).extend(subs)
+        return paint
+
     def draw_sprite(self, xf, arm_l, arm_r, eye, eye_dx, eye_dy, step, tuck, ch=None):
         orange, orange_d, dark = self.body_colors(ch)
+        paint = self.body_paint(ch or self.character_now())
         x0, y0 = -SW / 2, -SH / 2
         for key, r0, c0, r1, c1 in BLOCKS:
             x, y = x0 + c0 * PX, y0 + r0 * PX
@@ -3085,6 +3105,13 @@ class Widget:
             elif key == "arm_r":
                 y += arm_r
             self.px_rect(xf, x, y, color, w, h)
+            if paint:
+                runs = []
+                for r in range(r0, r1 + 1):
+                    for c in range(c0, c1 + 1):
+                        for dx, dy, pw, ph, col in paint.get((r, c), ()):
+                            runs.append((x + (c - c0) * PX + dx, y + (r - r0) * PX + dy, pw, ph, col))
+                self.blocks(xf, runs)
 
         for r, c in EYES:
             x, y = x0 + c * PX, y0 + r * PX
@@ -3137,7 +3164,11 @@ class Widget:
             if fx:                                   # e.g. a hat trailing in the wind
                 tx, ty = xf.pt(fx[0], fx[1])
                 pxf = Xform(tx, ty, xf.sx, xf.sy, xf.rot + fx[2])
-            self.blocks(pxf, self.skins.runs(path) or [])
+            if layer == "front" and path in self.skin_paths(ch):
+                runs = self.skins.skin(path, BODY_CELLS)[1]      # only what sticks out of the body
+            else:
+                runs = self.skins.runs(path) or []
+            self.blocks(pxf, runs)
 
     def blocks(self, xf, runs):
         """Many sprite blocks at once: one Tcl command instead of one call per block (a costume

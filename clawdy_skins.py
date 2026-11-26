@@ -21,6 +21,7 @@ class Skins:
         self.tk = tk_module
         self.cache = {}                    # path -> (mtime, runs)
         self.last = {}                     # path -> (checked at, runs): the disk is asked once a second
+        self.splits = {}                   # path -> (mtime, (paint, overlay)) for body parts and skins
 
     def runs(self, path):
         hit = self.last.get(path)
@@ -45,6 +46,22 @@ class Skins:
             runs = None                    # half-saved or not a PNG: draw nothing
         self.cache[path] = (mtime, runs)
         return runs
+
+    def skin(self, path, cells):
+        """(paint, overlay runs) of a body part or skin, see split_skin(); cached by file."""
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return {}, []
+        hit = self.splits.get(path)
+        if hit and hit[0] == mtime:
+            return hit[1]
+        try:
+            out = split_skin(self.pixels(path), cells)
+        except Exception:
+            out = ({}, [])
+        self.splits[path] = (mtime, out)
+        return out
 
     def pixels(self, path):
         """{(px, py): '#rrggbb'} of an image, for previews and flattening."""
@@ -81,6 +98,50 @@ class Skins:
             else:
                 merged.append([x, y, n, 1, col])
         return [(X0 + x * CELL, Y0 + y * CELL, n * CELL, h * CELL, col) for x, y, n, h, col in merged]
+
+
+def merge_runs(pix):
+    """{(px, py): color} -> [(x, y, w, h, color)] in sprite units, like load()."""
+    runs = []
+    for py in range(SIZE):
+        run = None
+        for px in range(SIZE + 1):
+            col = pix.get((px, py))
+            if run and col == run[1]:
+                run[2] += 1
+                continue
+            if run:
+                runs.append((run[0], py, run[2], 1, run[1]))
+            run = [px, col, 1] if col else None
+    merged = []
+    for x, y, n, _, col in runs:
+        for m in merged:
+            if m[0] == x and m[2] == n and m[4] == col and m[1] + m[3] == y:
+                m[3] += 1
+                break
+        else:
+            merged.append([x, y, n, 1, col])
+    return [(X0 + x * CELL, Y0 + y * CELL, n * CELL, h * CELL, col) for x, y, n, h, col in merged]
+
+
+def split_skin(pix, cells):
+    """A body part or whole skin becomes paint on the body and an overlay for the rest.
+
+    `cells` are the (row, col) cells of Clawdy's sprite that make up its body, arms and legs;
+    each cell is 2×2 image pixels at (2 + 2*col, 12 + 2*row). Returns ({(row, col): [(dx, dy,
+    w, h, color)]} in sprite units inside the cell, [overlay runs]) — the paint moves with the
+    limb it is on, the overlay (a hat brim, a cape, a tree's branches) stays put."""
+    paint, rest = {}, dict(pix)
+    for r, c in cells:
+        subs = []
+        for j in range(2):
+            for i in range(2):
+                col = rest.pop((2 + 2 * c + i, 12 + 2 * r + j), None)
+                if col:
+                    subs.append((i * CELL, j * CELL, CELL, CELL, col))
+        if subs:
+            paint[(r, c)] = subs
+    return paint, merge_runs(rest)
 
 
 def frame_runs(tk_module, path):

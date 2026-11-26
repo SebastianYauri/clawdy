@@ -5,6 +5,11 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.6
 
+- **Costumes are worn, not laid on top.** A body part (or a whole skin) now paints
+  Clawdy's body, arms and legs cell by cell, so a raised arm keeps its sleeve
+  and a step moves the sock: no second body peeking out underneath. Only what
+  sticks out of the body (a cape, the tree's branches, a hat brim) is drawn over
+  it. The same on desktop walks.
 - **Every Christmas outfit moves its own way.** Walks: the reindeer trots on two
   beats with its antlers swaying, the elf skips on tiptoe with the bell on its
   hat ringing, the snowman slides and rocks without a step and leaves snow, the
