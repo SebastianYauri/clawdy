@@ -3,7 +3,7 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
-## 1.4.6
+## 1.4.7
 
 - **Your sessions' context, model and cost.** Clawdy registers a Claude Code
   status line next to its hooks (only if you don't have one): after every turn
