@@ -2722,9 +2722,9 @@ class Widget:
                 sx = 1.1
                 eye = "open"
         elif act == "websling":                  # Spidey: swings on a web from above
-            ax, ay = 8, -SH - 16                 # the anchor, up and a little to the right of home
-            L = 30
-            th = math.sin(t * 2.4) * 0.7
+            ax, ay = 8, -SH - 18                 # the anchor, up and a little to the right of home
+            L = 34
+            th = math.sin(t * 2.2) * 0.85
             self.pos = ax + math.sin(th) * L
             dy = ay + math.cos(th) * L + SH * 0.1
             rot = -th * 0.45
@@ -3729,9 +3729,9 @@ class Widget:
                 self.oval(x, y, r * 0.32, r * 0.3, hx(tuple(min(1, c_ + 0.2) for c_ in col), a * 0.8))
             elif k == "disc":                               # the shield in flight
                 sf = Xform(x, y, 1, 1, t * 14)
-                for rr, col in ((9, (0.85, 0.19, 0.23)), (7, (1, 1, 1)), (5, (0.85, 0.19, 0.23)), (3, (0.18, 0.36, 0.85))):
+                for rr, col in ((12, (0.85, 0.19, 0.23)), (9.3, (1, 1, 1)), (6.6, (0.85, 0.19, 0.23)), (4, (0.18, 0.36, 0.85))):
                     self.oval(x, y, rr, rr, hx(col))
-                self.poly([sf.pt(0, -2.6), sf.pt(2.5, 2), sf.pt(-2.5, 2)], hx((1, 1, 1)))
+                self.poly([sf.pt(0, -3.4), sf.pt(3.2, 2.6), sf.pt(-3.2, 2.6)], hx((1, 1, 1)))
             elif k == "bolt":                               # a lightning bolt from above
                 pts = [(x, y - 70)]
                 for i in range(1, 7):
@@ -3741,7 +3741,7 @@ class Widget:
                 self.line(flat, hx((1.0, 1.0, 1.0)), self.lw(1))
             elif k == "webline":                            # a strand of web
                 if q.get("abs_"):
-                    self.line((x, y, x + q["dx"], y + q["dy"]), hx((0.92, 0.92, 0.95), a), self.lw(1.2))
+                    self.line((x, y, x + q["dx"], y + q["dy"]), hx((0.92, 0.92, 0.95), a), self.lw(2))
                 else:
                     self.line((x, y, x + q["dx"] * (1 - a), y + q["dy"] * (1 - a)), hx((0.92, 0.92, 0.95), a), self.lw(1.2))
             elif k == "bauble":

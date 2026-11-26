@@ -13,6 +13,11 @@ MW, PAD = 400, 12
 TILE, GAP = 44, 47
 PER_ROW = (MW - 2 * PAD + (GAP - TILE)) // GAP
 PREVIEW_H = 118
+# the presets, by collection: (key, [presets]); each gets a header with its own little icon
+GROUPS = [("classic", ["none", "cowboy", "chef", "pirate", "astronaut", "ninja"]),
+          ("halloween", ["witch", "pumpkin", "ghost", "vampire", "frank"]),
+          ("xmas", ["santa", "elf", "reindeer", "snowman", "gingerbread", "tree"]),
+          ("avengers", ["iron", "captain", "thunder", "hulk", "spidey", "doom"])]
 
 
 class Creator:
@@ -63,9 +68,11 @@ class Creator:
         if self.tab not in self.tabs():
             self.tab = "presets"
         if self.tab == "presets":
-            n = len(character.PRESET_ORDER) + 1
             out.append(("presets", tr("creator.presets"), y))
-            y += 18 + ((n + 4) // 5) * 24 + 8
+            y += 18 + 24 + 6                                  # the Auto pill
+            for key, names in GROUPS:
+                y += 20 + ((len(names) + 5) // 6) * 24 + 4   # header + rows of pills
+            y += 2
         else:
             n = len(character.PARTS[self.tab]) + 1 if self.tab != "skin" else len(character.user_skins()) + 1
             out.append((self.tab, tr("creator." + ("mine" if self.tab == "skin" else self.tab)), y))
@@ -139,14 +146,22 @@ class Creator:
                     c.create_oval(S(cx - r), S(cy - r), S(cx + r), S(cy + r), fill=hx(rgb), outline="")
                     self.hits.append(((cx - 11, cy - 11, cx + 11, cy + 11), lambda key=key: self.set("color", key)))
             elif kind == "presets":
-                names = ["auto"] + character.PRESET_ORDER
-                pw = (MW - 2 * PAD - 4 * 5) / 5
-                for i, p in enumerate(names):
-                    col, row = i % 5, i // 5
-                    x1, y1 = PAD + col * (pw + 5), y + 18 + row * 24
-                    on = (p == "auto" and w.costume_pref == "auto") or (p != "auto" and w.costume_pref != "auto"
-                                                                        and character.matches(ch, p))
-                    self.pill(x1, y1, pw, 20, tr("costume." + p), on, lambda p=p: self.preset(p))
+                pw = (MW - 2 * PAD - 5 * 4) / 6
+                on = w.costume_pref == "auto"
+                self.pill(PAD, y + 18, pw, 20, tr("costume.auto"), on, lambda: self.preset("auto"))
+                c.create_text(S(PAD + pw + 10), S(y + 28), text=tr("creator.auto_hint"), anchor="w", fill=hx(self.DIM), font=font(6.5))
+                yy = y + 18 + 24 + 6
+                for key, names in GROUPS:
+                    self.icon(key, PAD, yy + 2)
+                    c.create_text(S(PAD + 18), S(yy + 8), text=tr("creator.group." + key), anchor="w",
+                                  fill=hx(self.DIM), font=font(7, True))
+                    yy += 20
+                    for i, p in enumerate(names):
+                        col, row = i % 6, i // 6
+                        x1, y1 = PAD + col * (pw + 4), yy + row * 24
+                        on = w.costume_pref != "auto" and character.matches(ch, p)
+                        self.pill(x1, y1, pw, 20, tr("costume." + p), on, lambda p=p: self.preset(p))
+                    yy += ((len(names) + 5) // 6) * 24 + 4
             else:
                 options = [None] + (character.PARTS[kind] if kind != "skin" else [n for n, _ in character.user_skins()])
                 for i, opt in enumerate(options):
@@ -207,6 +222,44 @@ class Creator:
         cx, cy = (x1 + TILE / 2) * k, (y1 + TILE / 2 + 9) * k
         ch = {"color": w.character_now()["color"], slot: name}
         w.draw_still(self.canvas, cx, cy, s, ch, "open")
+
+    def icon(self, key, x, y):
+        """A 12×12 pixel icon for a collection, drawn by hand: ours, not anyone's logo."""
+        c, k = self.canvas, self.k
+        S = lambda v: v * k
+        hx = self.hx
+
+        def px(gx, gy, col, w_=1, h_=1):
+            c.create_rectangle(S(x + gx), S(y + gy), S(x + gx + w_), S(y + gy + h_), fill=hx(col), width=0)
+        if key == "classic":                                  # a little Clawdy
+            px(1, 2, (0.85, 0.47, 0.34), 10, 7)
+            px(0, 4, (0.85, 0.47, 0.34), 12, 2)
+            px(3, 4, (0.1, 0.08, 0.07), 1, 2)
+            px(8, 4, (0.1, 0.08, 0.07), 1, 2)
+            px(3, 9, (0.70, 0.36, 0.26), 1, 2)
+            px(8, 9, (0.70, 0.36, 0.26), 1, 2)
+        elif key == "halloween":                              # a pumpkin
+            px(5, 0, (0.31, 0.55, 0.21), 2, 2)
+            px(1, 2, (0.95, 0.55, 0.15), 10, 8)
+            px(0, 4, (0.95, 0.55, 0.15), 12, 5)
+            px(3, 5, (0.25, 0.12, 0.05), 2, 2)
+            px(7, 5, (0.25, 0.12, 0.05), 2, 2)
+            px(4, 8, (0.25, 0.12, 0.05), 4, 1)
+        elif key == "xmas":                                   # a tree with a star
+            px(5, 0, (1.0, 0.85, 0.35), 2, 2)
+            px(4, 2, (0.18, 0.62, 0.31), 4, 2)
+            px(3, 4, (0.18, 0.62, 0.31), 6, 2)
+            px(2, 6, (0.18, 0.62, 0.31), 8, 2)
+            px(1, 8, (0.18, 0.62, 0.31), 10, 2)
+            px(5, 10, (0.45, 0.28, 0.12), 2, 2)
+            px(4, 5, (1.0, 0.29, 0.29)); px(7, 7, (0.35, 0.80, 1.0)); px(3, 9, (1.0, 0.85, 0.35))
+        elif key == "avengers":                               # an A in a ring
+            px(2, 0, (0.75, 0.78, 0.84), 8, 1); px(2, 11, (0.75, 0.78, 0.84), 8, 1)
+            px(0, 2, (0.75, 0.78, 0.84), 1, 8); px(11, 2, (0.75, 0.78, 0.84), 1, 8)
+            px(1, 1, (0.75, 0.78, 0.84)); px(10, 1, (0.75, 0.78, 0.84)); px(1, 10, (0.75, 0.78, 0.84)); px(10, 10, (0.75, 0.78, 0.84))
+            px(5, 2, (0.90, 0.92, 0.96), 2, 1); px(4, 3, (0.90, 0.92, 0.96), 1, 3); px(7, 3, (0.90, 0.92, 0.96), 1, 3)
+            px(3, 6, (0.90, 0.92, 0.96), 1, 4); px(8, 6, (0.90, 0.92, 0.96), 1, 4); px(4, 6, (0.90, 0.92, 0.96), 4, 1)
+            px(8, 9, (0.90, 0.92, 0.96), 2, 1)
 
     def pill(self, x, y, w_, h, text, on, fn):
         c, k = self.canvas, self.k

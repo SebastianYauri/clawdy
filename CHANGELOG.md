@@ -5,6 +5,9 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.8
 
+- **Presets by collection.** The creator's Presets tab groups them: Classics,
+  Halloween, Christmas and Avengers · Doomsday, each with its own little
+  pixel icon (ours, not anyone's logo), and Auto explained in a line.
 - **Six heroes for the Doomsday season.** Presets Iron (red and gold suit,
   glowing eye slits, arc reactor), Captain (winged helmet, star suit, striped
   boots), Thunder (winged helm, chest plates, a red cape behind), Hulk (green,
