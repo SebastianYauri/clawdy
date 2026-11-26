@@ -139,12 +139,14 @@ class PetWindow:
                     cr.rectangle(min(x0, x1), min(y0, y1), abs(x1 - x0), abs(y1 - y0))
                     cr.fill()
                     cr.set_antialias(cairo.ANTIALIAS_DEFAULT)
-                else:
+                else:                                     # rotated blocks: crisp too, or the joins show
+                    cr.set_antialias(cairo.ANTIALIAS_NONE)
                     cr.move_to(pts[0], pts[1])
                     for i in range(2, len(pts), 2):
                         cr.line_to(pts[i], pts[i + 1])
                     cr.close_path()
                     cr.fill()
+                    cr.set_antialias(cairo.ANTIALIAS_DEFAULT)
             elif kind == "arc":                      # Tk angles: degrees counter-clockwise from 3 o'clock
                 x0, y0, x1, y1 = pts
                 start, extent, width = op[3], op[4], op[5]
