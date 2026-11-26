@@ -3,6 +3,17 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.8
+
+- **A finer sleigh.** Santa's and the reindeer's sleigh flight is rendered at
+  twice the detail with 12 frames: the reindeer gallop with their hooves
+  lifting, heads nodding and tails flicking, bells bounce on the harness,
+  Rudolph's nose glows, the sleigh rocks, the hat's pompom sways and the gifts
+  ride behind. The flight itself accelerates off the porthole with a little
+  overshoot, swoops across the top of the screen, comes round from the other
+  side and glides in with a flare before landing, trailing magic dust that
+  drifts down.
+
 ## 1.4.7
 
 - **Your sessions' context, model and cost.** Clawdy registers a Claude Code

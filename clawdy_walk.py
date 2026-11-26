@@ -160,8 +160,9 @@ def _monitor_mac(x, y, sw, sh):
 FLIERS = ("vampire", "ghost", "witch", "pumpkin")   # these leave by air instead of the rope
 SLEIGH = ("santa", "reindeer")                      # these take the sleigh
 FLOORED = ("frank", "snowman", "tree", "gingerbread")   # these go along the bottom of the screen, each its way
-SLEIGH_FRAMES = 6
-SLEIGH_SEAT = (51, 14)                              # where Clawdy sits in a sleigh frame (image pixels)
+SLEIGH_FRAMES = 12
+SLEIGH_SEAT = (51, 14)                              # where Clawdy sits in a sleigh frame (grid units)
+SLEIGH_PX = 0.5                                     # a sleigh image pixel is half a grid unit (fine detail)
 
 
 def sleigh_frames(widget):
@@ -350,11 +351,14 @@ class Walk:
         self.trail = []
         self.costume = widget.costume()
         self.gw, self.gh, self.frames = GW, GH, None
+        self.fs = 1.0                            # grid units per frame pixel
         if self.costume in SLEIGH:
             got = sleigh_frames(widget)
             if got:
-                self.frames, self.gw, self.gh = got
-        self.pw, self.ph = self.gw * p, self.gh * p
+                self.frames, fw, fh = got
+                self.fs = SLEIGH_PX if fw > 64 else 1.0
+                self.gw, self.gh = fw * self.fs, fh * self.fs
+        self.pw, self.ph = round(self.gw * p), round(self.gh * p)
         self.colors = widget.body_colors()
         self.wear = wear_from(widget)
         self.shaper = None
@@ -393,10 +397,10 @@ class Walk:
         x0 = self.pcx - self.pw / 2
         if self.mode == "sleigh":
             self.x0, self.y0 = self.pcx - SLEIGH_SEAT[0] * p, self.pcy - SLEIGH_SEAT[1] * p
-            self.v = 170 * k
-            self.out = min(140 * k, max(0.0, self.mon[2] - self.x0 - self.pw))
-            self.phases = [("up", 1.6), ("cross", max(0.5, (self.mon[2] - (self.x0 + self.out)) / self.v)),
-                           ("wrap", max(0.5, (self.x0 - self.out - self.mon[0] + self.pw) / self.v)), ("land", 1.6)]
+            self.v = 190 * k
+            self.out = min(160 * k, max(0.0, self.mon[2] - self.x0 - self.pw))
+            self.phases = [("up", 2.0), ("cross", max(0.5, (self.mon[2] - (self.x0 + self.out)) / self.v)),
+                           ("wrap", max(0.5, (self.x0 - self.out - self.mon[0] + self.pw) / self.v)), ("land", 2.2)]
         elif self.mode == "fly":
             self.D = max(0.0, min(320 * k, room))
             self.phases = [("out", 2.4), ("loop", 3.6), ("home", 2.4)]
@@ -498,39 +502,49 @@ class Walk:
         return True
 
     def sleigh_step(self, name, q, frame):
-        """Up out of the porthole, across the top to the right, round from the left, and home."""
+        """Takes off from the porthole in an accelerating arc, crosses the top of the screen with
+        a long swoop, comes round from the other side and glides down to land, flaring at the end."""
         x0, y0, lane, out, k = self.x0, self.y0, self.lane, self.out, self.w.k
-        if name == "up":
-            e = ease(q)
-            x, y = x0 + out * e, y0 + (lane - y0) * e
-        elif name == "cross":
-            x, y = x0 + out + (self.mon[2] - (x0 + out)) * q, lane
+        gh = self.gh
+        if name == "up":                         # ease in: slow at first, then away
+            e = q * q * (3 - 2 * q)
+            ex = q * q
+            x = x0 + out * ex
+            y = y0 + (lane - y0) * e - math.sin(q * math.pi) * 10 * k      # a small overshoot above the lane
+        elif name == "cross":                    # a swoop: dips a little, then climbs
+            x = x0 + out + (self.mon[2] - (x0 + out)) * q
+            y = lane + math.sin(q * math.pi) * 34 * k
         elif name == "wrap":
-            x, y = self.mon[0] - self.pw + (x0 - out - self.mon[0] + self.pw) * q, lane
-        else:
-            e = ease(q)
-            x, y = x0 - out + out * e, lane + (y0 - lane) * e
-        bob = math.sin(self.t * 2.6) * 4 * k
-        # a trail of sparkles behind the runners
-        self.trail = [(tx, ty, col, born) for tx, ty, col, born in self.trail if self.t - born < 0.6]
-        if int(self.t * 24) % 2 == 0:
-            self.trail.append((random.randint(0, 20), random.randint(self.gh - 10, self.gh - 2),
-                               random.choice(("#ffd75a", "#ffffff", "#8cd9ff")), self.t))
-        self.draw_frame(int(self.t * 10) % len(self.frames), x, y + bob,
-                        extra=[(tx, ty, 1, 1, col) for tx, ty, col, _ in self.trail])
+            x = self.mon[0] - self.pw + (x0 - out - self.mon[0] + self.pw) * q
+            y = lane + math.sin(q * math.pi) * 22 * k
+        else:                                    # ease out: glides in, flares, lands softly
+            e = 1 - (1 - q) ** 3
+            x = x0 - out + out * e
+            y = lane + (y0 - lane) * e + math.sin(q * math.pi) * 8 * k
+        bob = math.sin(self.t * 2.4) * 3 * k
+        # magic dust streams off the runners and drifts down behind
+        self.trail = [(tx, ty + (self.t - born) * 6, col, born) for tx, ty, col, born in self.trail if self.t - born < 0.9]
+        if int(self.t * 30) % 2 == 0:
+            self.trail.append((random.uniform(0, 14), random.uniform(gh * 0.55, gh * 0.85),
+                               random.choice(("#ffd75a", "#ffffff", "#8cd9ff", "#ffb347")), self.t))
+        self.draw_frame(int(self.t * 12) % len(self.frames), x, y + bob,
+                        extra=[(round(tx), round(ty), 1, 1, col) for tx, ty, col, _ in self.trail if ty < gh])
 
     def draw_frame(self, i, x, y, extra=()):
-        key = ("frame", i, len(extra))
+        key = ("frame", i, tuple(extra))
         if key != self._last_key:
             self._last_key = key
-            c, p = self.canvas, self.p
+            c, p, fs = self.canvas, self.p, self.fs
             c.delete("all")
-            rects = self.frames[i] + list(extra)
+            rects = [(rx * fs, ry * fs, rw * fs, rh * fs, col) for rx, ry, rw, rh, col in self.frames[i]] + list(extra)
+            boxes = []
             for rx, ry, rw, rh, col in rects:
-                c.create_rectangle(rx * p, ry * p, (rx + rw) * p, (ry + rh) * p, fill=col, width=0)
+                x0, y0, x1, y1 = round(rx * p), round(ry * p), round((rx + rw) * p), round((ry + rh) * p)
+                c.create_rectangle(x0, y0, x1, y1, fill=col, width=0)
+                boxes.append((x0, y0, x1 - x0, y1 - y0))
             if self.shaper:
                 try:
-                    self.shaper.set([(rx * p, ry * p, rw * p, rh * p) for rx, ry, rw, rh, _ in rects])
+                    self.shaper.set(boxes)
                 except Exception:
                     self.shaper = None
         self.win.geometry("+%d+%d" % (round(x), round(y)))
