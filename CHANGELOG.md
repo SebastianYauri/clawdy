@@ -5,6 +5,11 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.8
 
+- **HD parts and skins.** A part or skin can be a 64×64 PNG: same layout as the
+  32×32 ones at twice the detail (thin lines, curves, bevels), drawn with
+  half-size pixels and still moving with the limbs. 32×32 parts keep working
+  as they are. Spidey is the first HD costume: round lens eyes with a fine rim
+  and a glint, a one-pixel web radiating from the nose, a bevelled suit.
 - **Presets by collection.** The creator's Presets tab groups them: Classics,
   Halloween, Christmas and Avengers · Doomsday, each with its own little
   pixel icon (ours, not anyone's logo), and Auto explained in a line.

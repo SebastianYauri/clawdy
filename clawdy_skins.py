@@ -9,9 +9,9 @@ the user's own whole skins in <config>/skins/ (see clawdy_character.py).
 import os
 import time
 
-CELL = 3                  # sprite units per image pixel (a Clawdy pixel is 6)
+CELL = 3                  # sprite units per image pixel of a 32×32 part (a Clawdy pixel is 6)
 X0, Y0 = -48, -63         # the sprite point at the image's top-left corner
-SIZE = 32
+SIZE = 32                 # the part grid; a 64×64 image is an HD part: twice the detail, same place
 
 
 class Skins:
@@ -22,6 +22,7 @@ class Skins:
         self.cache = {}                    # path -> (mtime, runs)
         self.last = {}                     # path -> (checked at, runs): the disk is asked once a second
         self.splits = {}                   # path -> (mtime, (paint, overlay)) for body parts and skins
+        self.natives = {}                  # path -> (mtime, (scale, {(x, y): color})) at the image's own size
 
     def runs(self, path):
         hit = self.last.get(path)
@@ -57,55 +58,62 @@ class Skins:
         if hit and hit[0] == mtime:
             return hit[1]
         try:
-            out = split_skin(self.pixels(path), cells)
+            f, pix = self.native(path)
+            out = split_skin(pix, cells, f)
         except Exception:
             out = ({}, [])
         self.splits[path] = (mtime, out)
         return out
 
-    def pixels(self, path):
-        """{(px, py): '#rrggbb'} of an image, for previews and flattening."""
+    def native(self, path):
+        """(scale, {(px, py): '#rrggbb'}) at the image's own resolution: scale 1 for a 32×32
+        part, 2 for a 64×64 HD part. Cached by file."""
+        mtime = os.path.getmtime(path)
+        hit = self.natives.get(path)
+        if hit and hit[0] == mtime:
+            return hit[1]
         img = self.tk.PhotoImage(file=path)
-        w, h = min(img.width(), SIZE), min(img.height(), SIZE)
+        f = 2 if min(img.width(), img.height()) >= 2 * SIZE else 1
+        n = SIZE * f
+        w, h = min(img.width(), n), min(img.height(), n)
         out = {}
         for py in range(h):
             for px in range(w):
                 if not img.transparency_get(px, py):
                     r, g, b = img.get(px, py)[:3]
                     out[(px, py)] = "#%02x%02x%02x" % (r, g, b)
+        self.natives[path] = (mtime, (f, out))
+        return f, out
+
+    def pixels(self, path):
+        """{(px, py): '#rrggbb'} on the 32×32 part grid, for previews, walks and flattening:
+        an HD part gives each 2×2 block its most common colour (if at least half is drawn)."""
+        f, pix = self.native(path)
+        if f == 1:
+            return dict(pix)
+        votes = {}
+        for (x, y), col in pix.items():
+            votes.setdefault((x // f, y // f), []).append(col)
+        out = {}
+        for cell, cols in votes.items():
+            if len(cols) * 2 >= f * f:
+                out[cell] = max(set(cols), key=cols.count)
         return out
 
     def load(self, path):
-        """[(x, y, w, h, '#rrggbb')] in sprite units: same-color pixels merged into blocks."""
-        pix = self.pixels(path)
-        runs = []
-        for py in range(SIZE):
-            run = None
-            for px in range(SIZE + 1):
-                col = pix.get((px, py))
-                if run and col == run[1]:
-                    run[2] += 1
-                    continue
-                if run:
-                    runs.append((run[0], py, run[2], 1, run[1]))
-                run = [px, col, 1] if col else None
-        merged = []                        # identical runs in consecutive rows become one block
-        for x, y, n, _, col in runs:
-            for m in merged:
-                if m[0] == x and m[2] == n and m[4] == col and m[1] + m[3] == y:
-                    m[3] += 1
-                    break
-            else:
-                merged.append([x, y, n, 1, col])
-        return [(X0 + x * CELL, Y0 + y * CELL, n * CELL, h * CELL, col) for x, y, n, h, col in merged]
+        """[(x, y, w, h, '#rrggbb')] in sprite units: same-color pixels merged into blocks,
+        at the image's own resolution (an HD part draws with half-size pixels)."""
+        f, pix = self.native(path)
+        return merge_runs(pix, SIZE * f, CELL / f)
 
 
-def merge_runs(pix):
-    """{(px, py): color} -> [(x, y, w, h, color)] in sprite units, like load()."""
+def merge_runs(pix, n=SIZE, cell=CELL):
+    """{(px, py): color} on an n×n grid -> [(x, y, w, h, color)] in sprite units, `cell` units
+    per pixel: same-colour pixels merged into blocks."""
     runs = []
-    for py in range(SIZE):
+    for py in range(n):
         run = None
-        for px in range(SIZE + 1):
+        for px in range(n + 1):
             col = pix.get((px, py))
             if run and col == run[1]:
                 run[2] += 1
@@ -121,10 +129,10 @@ def merge_runs(pix):
                 break
         else:
             merged.append([x, y, n, 1, col])
-    return [(X0 + x * CELL, Y0 + y * CELL, n * CELL, h * CELL, col) for x, y, n, h, col in merged]
+    return [(X0 + x * cell, Y0 + y * cell, w * cell, h * cell, col) for x, y, w, h, col in merged]
 
 
-def split_skin(pix, cells):
+def split_skin(pix, cells, f=1):
     """A body part or whole skin becomes paint on the body and an overlay for the rest.
 
     `cells` are the (row, col) cells of Clawdy's sprite that make up its body, arms and legs;
@@ -132,11 +140,17 @@ def split_skin(pix, cells):
     w, h, color)]} in sprite units inside the cell, [overlay runs]) — the paint moves with the
     limb it is on, the overlay (a hat brim, a cape, a tree's branches) stays put."""
     paint, rest = {}, dict(pix)
-    for r, c in cells:                          # a cell is exactly one image pixel
-        col = rest.pop((2 + c, 12 + r), None)
-        if col:
-            paint[(r, c)] = [(0, 0, CELL, CELL, col)]
-    return paint, merge_runs(rest)
+    sub = CELL / f
+    for r, c in cells:                          # a cell is one pixel of a 32×32 part, f×f of an HD one
+        subs = []
+        for j in range(f):
+            for i in range(f):
+                col = rest.pop((f * (2 + c) + i, f * (12 + r) + j), None)
+                if col:
+                    subs.append((i * sub, j * sub, sub, sub, col))
+        if subs:
+            paint[(r, c)] = subs
+    return paint, merge_runs(rest, SIZE * f, sub)
 
 
 def frame_runs(tk_module, path):
@@ -215,7 +229,8 @@ half a Clawdy pixel; use _clawdy-reference.png as a guide layer to see where
 the body is (leave the eyes clear so they stay alive), and _current-look.png
 is what you're wearing now, flattened, to start from. A file named
 my-skin_back.png is drawn behind Clawdy (capes). Files starting with _ are
-ignored.
+ignored. A 64x64 PNG is an HD skin: same layout at twice the detail (each
+pixel of the 32x32 grid becomes 2x2).
 
 ES: Dibuja un PNG de 32x32 en un editor de pixel art como Pixelorama (gratis) y
 guardalo en esta carpeta, por ejemplo mi-skin.png. Aparece en "Mis skins" en la

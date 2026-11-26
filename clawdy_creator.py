@@ -347,7 +347,7 @@ class Creator:
             return
         try:
             img = self.tk.PhotoImage(file=path)
-            ok = img.width() == 32 and img.height() == 32
+            ok = (img.width(), img.height()) in ((32, 32), (64, 64))     # a part, or an HD part
         except Exception:
             ok = False
         if not ok:

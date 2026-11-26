@@ -120,7 +120,7 @@ STRINGS = {
     "creator.import": ("Import PNG…", "Importar PNG…"),
     "creator.draw": ("Draw my own…", "Dibujar la mía…"),
     "creator.close": ("Close", "Cerrar"),
-    "creator.bad_png": ("needs a 32×32 PNG", "debe ser un PNG de 32×32"),
+    "creator.bad_png": ("needs a 32×32 or 64×64 PNG", "debe ser un PNG de 32×32 o 64×64"),
     "creator.none": ("none", "nada"),
     "creator.auto_hint": ("the season's outfit, a different one each day", "el traje de la temporada, distinto cada día"),
     "creator.group.classic": ("Classics", "Clásicos"),
