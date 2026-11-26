@@ -3,6 +3,7 @@ state files) and recent chats (from the transcripts Claude Code keeps in
 ~/.claude/projects), so they can be brought to the front, resumed or started."""
 import json
 import os
+import re
 import time
 
 import clawdy_system as cs
@@ -70,6 +71,8 @@ def _title(path):
                         c = (d.get("message") or {}).get("content")
                         if isinstance(c, list):
                             c = " ".join(p.get("text", "") for p in c if isinstance(p, dict))
+                        if isinstance(c, str):
+                            c = re.sub(r"\[(Image|Imagen)\b[^\]]*\]", " ", c)   # a pasted picture isn't a title
                         if isinstance(c, str) and c.strip() and not c.lstrip().startswith("<"):
                             first = " ".join(c.split())
     except OSError:

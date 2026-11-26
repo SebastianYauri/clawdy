@@ -1526,7 +1526,7 @@ class Widget:
             return tr("sessions.question", t=age(s["ask"])), True
         if s["state"] == "error":
             return label("error", short=True), True
-        ctx = " · " + tr("sessions.ctx", p=round(s["ctx"])) if s.get("ctx") is not None else ""
+        ctx = " · " + tr("sessions.ctx", p=round(s["ctx"])) if (s.get("ctx") or 0) >= 1 else ""
         if working and s["state"] in PRIO and s["state"] not in ("happy", "notification"):
             return tr("sessions.working", what=label(s["state"], short=True), t=age(s["started"])) + ctx, False
         if s["done"]:
@@ -3959,6 +3959,7 @@ class PopupMenu:
     def __init__(self, w, x_root, y_root, items=None, width=None):
         self.w, self.k = w, w.k
         self.hover, self.closed = None, False
+        self._fonts = {}
         self.opened = self.last_motion = time.time()
         self.left_at = self.opened + GRACE      # never reached by the mouse (e.g. opened from the tray): close soon
         if width:
@@ -3998,6 +3999,27 @@ class PopupMenu:
         except tk.TclError:
             pass
         self.win.after(250, self.watch)
+
+    def measure(self, text, font):
+        from tkinter import font as tkfont
+        key = tuple(font)
+        f = self._fonts.get(key)
+        if f is None:
+            f = self._fonts[key] = tkfont.Font(root=self.win, font=font)
+        return f.measure(text)
+
+    def fit(self, text, font, room):
+        """The text, cut with an ellipsis so it is at most `room` pixels wide."""
+        if self.measure(text, font) <= room:
+            return text
+        lo, hi = 0, len(text)
+        while lo < hi:                           # the longest prefix that fits
+            mid = (lo + hi + 1) // 2
+            if self.measure(text[:mid] + "…", font) <= room:
+                lo = mid
+            else:
+                hi = mid - 1
+        return (text[:lo].rstrip() + "…") if lo else "…"
 
     # -------- layout --------
     def layout(self):
@@ -4068,10 +4090,13 @@ class PopupMenu:
                     c.create_oval(S(lx), S((y1 + y2) / 2 - 3), S(lx + 6), S((y1 + y2) / 2 + 3),
                                   fill=hx(it[6]), width=0)
                     lx += 12
-                c.create_text(S(lx), S((y1 + y2) / 2), text=it[1], fill=hx(col), anchor="w", font=font(9))
+                label = it[1]
                 if kind == "action" and len(it) > 4 and it[4]:          # detail on the right
                     c.create_text(S(x2 - 6), S((y1 + y2) / 2), text=it[4], fill=hx(it[5] or DIM),
                                   anchor="e", font=font(7))
+                    room = S(x2 - 6) - S(lx) - self.measure(it[4], font(7)) - S(10)
+                    label = self.fit(label, font(9), room)              # never runs into the detail
+                c.create_text(S(lx), S((y1 + y2) / 2), text=label, fill=hx(col), anchor="w", font=font(9))
                 if kind == "toggle":                       # switch
                     on = bool(it[2].get())
                     tx2, ty = S(x2 - 8), S((y1 + y2) / 2)
