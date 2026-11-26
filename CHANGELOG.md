@@ -3,6 +3,29 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.5
+
+- **Fix: Clawdy stayed a dark, empty card after install.** When the first
+  usage request could not succeed right away (session expired overnight, no
+  network yet, an API error), the mascot never came out: only the loading dots.
+  It now appears regardless, with the last numbers or empty rings and a note,
+  and keeps retrying. Any error while drawing a frame is now written to
+  `clawdy.log` in Clawdy's cache folder and shown as a note instead of
+  freezing the window.
+- **Pet mode uses a fraction of the CPU** (about 38% of a core down to 8% with a
+  costume on): the GTK pet window gets its drawing commands directly instead of
+  Clawdy building and reading back hundreds of invisible Tk items per frame;
+  identical frames aren't repainted; idle frame rate 24.
+- **Popups stay on their monitor.** The menu and the skin creator open inside
+  the monitor they belong to (upwards from the bottom edge), and the menu closes
+  again when you click away on Wayland.
+- **Christmas wardrobe.** New hand-drawn parts (elf hat, antlers, top hat, red
+  nose, carrot, snow coat, gingerbread, tree, sweater) and presets Elf,
+  Reindeer, Snowman, Gingerbread and Tree; in **Auto** Clawdy wears a different
+  one each day of the season, with snow. Santa and the reindeer take a sleigh
+  (rendered in 3D, pixel style) across the top of the screen on their walks.
+  Parts can be animated (`name_f2.png`, `name_f3.png`…).
+
 ## 1.4.4
 
 - **Back to the chat you already have open.** In the chats tree, sessions whose

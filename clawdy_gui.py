@@ -487,8 +487,13 @@ def bars(data):
 
 def _passed(iso):
     try:
-        return bool(iso) and datetime.fromisoformat(iso) <= datetime.now(timezone.utc)
-    except ValueError:
+        if not iso:
+            return False
+        when = datetime.fromisoformat(iso)
+        if when.tzinfo is None:                 # a naive time can't be compared to an aware one
+            when = when.replace(tzinfo=timezone.utc)
+        return when <= datetime.now(timezone.utc)
+    except (ValueError, TypeError):
         return False
 
 
@@ -613,6 +618,7 @@ class Widget:
         self._screens = None                        # the monitor layout, to notice a screen plugged or unplugged
         self._pet_frame = None                      # the last frame handed to the GTK pet window
         self._rec = None                            # drawing commands being recorded for it (see rect())
+        self._crashes = set()                       # frame exceptions already written to clawdy.log
         self._anchor = False                        # True while the Tk window is a 1-px anchor (GTK pet)
         self.col_in = self.panel_in = False
         self.left_at = 0.0
@@ -1492,6 +1498,25 @@ class Widget:
         if self.dbg:
             self.dbg.write("%.3f %s\n" % (time.time() % 1000, " ".join(str(p) for p in parts)))
 
+    def crash(self, e):
+        """An exception while drawing a frame: write it to clawdy.log (once per kind) and show a
+        note, so a bug shows as a message instead of a frozen dark card."""
+        import traceback
+        key = (type(e).__name__, str(e)[:80])
+        if key in self._crashes:
+            return
+        self._crashes.add(key)
+        try:
+            with open(os.path.join(os.path.dirname(cs.USAGE_CACHE), "clawdy.log"), "a", encoding="utf-8") as f:
+                f.write("%s Clawdy %s\n%s\n" % (datetime.now().isoformat(timespec="seconds"), VERSION,
+                                               traceback.format_exc()))
+        except OSError:
+            pass
+        try:
+            self.flash("%s: %s" % (type(e).__name__, str(e)[:40]), 30)
+        except Exception:
+            pass
+
     def on_motion(self, ev):
         if not self.col_in:
             self.log("ENTER column", ev.x, ev.y, "e=%.2f" % self.e)
@@ -2042,6 +2067,8 @@ class Widget:
             self.draw()
         except tk.TclError:
             return
+        except Exception as e:                  # a bug in one frame must not freeze the window
+            self.crash(e)
         busy = (0.0 < self.e < 1.0 or self.col_in or self.panel_in or self.target != self.e
                 or self.held or time.time() < max(self.dizzy_until, self.land_until))
         period = 1.0 / (FPS_FAST if busy else FPS)
