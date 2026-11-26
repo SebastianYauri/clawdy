@@ -1492,18 +1492,46 @@ class Widget:
             items.append(("note", tr("sessions.none")))
         self.popup_menu = PopupMenu(self, x, y, items=items, width=300)
 
+    def watch_context(self, now):
+        """A session whose context is nearly full gets one warning (it will compact soon)."""
+        if now - getattr(self, "_ctx_at", 0) < 15:
+            return
+        self._ctx_at = now
+        warned = getattr(self, "_ctx_warned", None)
+        if warned is None:
+            warned = self._ctx_warned = {}
+        for s in sessions.open_sessions(now):
+            ctx = s.get("ctx")
+            if ctx is None:
+                continue
+            if ctx >= 85 and not warned.get(s["id"]):
+                warned[s["id"]] = True
+                what = str(s.get("project") or "")
+                what = what[:14] + ("…" if len(what) > 14 else "")
+                self.flash(tr("sessions.ctx_high", p=round(ctx), what=what), 8)
+                for _ in range(3):
+                    self.spawn("drop", SCENE_W / 2 + random.uniform(-16, 16), 70, random.uniform(-10, 10), -20, 1.0)
+            elif ctx < 60:
+                warned.pop(s["id"], None)
+
     def session_detail(self, s, now, age):
         """What an open session is up to, in a few words: (text, needs you?)."""
         working = s["started"] and s["started"] > max(s["done"], 0)
         if s["state"] == "notification" and s.get("ask_kind") == "permission" and s["ask"] >= s["started"]:
+            what = s.get("ask_text")
+            if what:
+                return tr("sessions.permission_for", what=what[:26] + ("…" if len(what) > 26 else ""), t=age(s["ask"])), True
             return tr("sessions.permission", t=age(s["ask"])), True
+        if s["state"] == "notification" and s.get("ask_kind") == "waiting" and s["ask"] >= s["started"]:
+            return tr("sessions.question", t=age(s["ask"])), True
         if s["state"] == "error":
             return label("error", short=True), True
+        ctx = " · " + tr("sessions.ctx", p=round(s["ctx"])) if s.get("ctx") is not None else ""
         if working and s["state"] in PRIO and s["state"] not in ("happy", "notification"):
-            return tr("sessions.working", what=label(s["state"], short=True), t=age(s["started"])), False
+            return tr("sessions.working", what=label(s["state"], short=True), t=age(s["started"])) + ctx, False
         if s["done"]:
-            return tr("sessions.done_ago", t=age(s["done"])), False
-        return tr("sessions.idle"), False
+            return tr("sessions.done_ago", t=age(s["done"])) + ctx, False
+        return tr("sessions.idle") + ctx, False
 
     def log(self, *parts):
         if self.dbg:
@@ -2189,6 +2217,7 @@ class Widget:
         elif now - self._act_read > 0.25:
             self._act_read = now
             self.work, active = read_sessions(now)
+            self.watch_context(now)
             self.update_crew(active, now)
         work = self.work
         if work != self._work_prev:

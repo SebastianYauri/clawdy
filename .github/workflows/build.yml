@@ -97,6 +97,8 @@ jobs:
 
           # The hook, run exactly like Claude Code runs it
           node packaging\ci\hook_test.js "$env:PROFILE\.claude\settings.json" "$env:LOCALAPPDATA\clawdy\sessions"
+          python packaging\ci\claude_sl_test.py "$env:LOCALAPPDATA\clawdy\sessions"
+          if ($LASTEXITCODE -ne 0) { throw "the Claude Code status line did not work" }
           if ($LASTEXITCODE -ne 0) { throw "the hook did not work" }
           # Antigravity: hooks + status line registered, the status line answers with the quota
           $env:HOME = $env:PROFILE
@@ -111,6 +113,8 @@ jobs:
           if ($run) { throw "start at login was left behind" }
           python packaging\ci\agy_after.py
           if ($LASTEXITCODE -ne 0) { throw "agy was not disconnected" }
+          python packaging\ci\claude_sl_test.py after
+          if ($LASTEXITCODE -ne 0) { throw "the Claude Code status line was left behind" }
           "connect and disconnect OK; the other hook is intact"
 
       - name: "Test: animations (demo mode)"
@@ -239,6 +243,7 @@ jobs:
           mkdir -p "$HOME/.gemini/antigravity-cli"; echo '{"colorScheme": "keep me"}' > "$HOME/.gemini/antigravity-cli/settings.json"
           clawdy --setup
           node packaging/ci/hook_test.js "$HOME/.claude/settings.json" "$HOME/.cache/clawdy/sessions"
+          python3 packaging/ci/claude_sl_test.py "$HOME/.cache/clawdy/sessions"
           python3 packaging/ci/agy_test.py "$HOME/.cache/clawdy/agy-quota.json"
           grep -q 'Exec=clawdy' "$HOME/.config/autostart/clawdy.desktop"
           xvfb-run -a clawdy --demo --selftest 5
@@ -251,6 +256,7 @@ jobs:
           print("disconnected; the other hook is intact")
           EOF
           python3 packaging/ci/agy_after.py
+          python3 packaging/ci/claude_sl_test.py after
 
       - name: "Test: auto-update (installed from source)"
         run: |
@@ -351,6 +357,7 @@ jobs:
           mkdir -p "$HOME/.gemini/antigravity-cli"; echo '{"colorScheme": "keep me"}' > "$HOME/.gemini/antigravity-cli/settings.json"
           "$BIN" --setup
           node packaging/ci/hook_test.js "$HOME/.claude/settings.json" "$HOME/Library/Caches/clawdy/sessions"
+          python3 packaging/ci/claude_sl_test.py "$HOME/Library/Caches/clawdy/sessions"
           python3 packaging/ci/agy_test.py "$HOME/Library/Caches/clawdy/agy-quota.json"
           test -f "$HOME/Library/LaunchAgents/com.clawdy.app.plist"
           "$BIN" --uninstall
@@ -362,6 +369,7 @@ jobs:
           print("disconnected; the other hook is intact")
           EOF
           python3 packaging/ci/agy_after.py
+          python3 packaging/ci/claude_sl_test.py after
 
       - name: "Test: animations (demo mode)"
         run: |

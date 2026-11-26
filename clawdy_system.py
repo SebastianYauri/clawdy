@@ -184,6 +184,28 @@ def hook_entry():
     return dict(base, command="[ -f %s ] && %s || true" % (shlex.quote(target), run))
 
 
+STATUS_FLAG = "--statusline-claude"
+
+
+def statusline_entry():
+    """Our status line for Claude Code: it runs after every turn with the session's model,
+    context use and cost on stdin (see clawdy_hook.statusline)."""
+    cmd = hook_command_prefix() + " " + STATUS_FLAG
+    return {"type": "command", "command": cmd if WIN else cmd + " || true"}
+
+
+def statusline_ours(sl):
+    cmd = str(sl.get("command", "")) if isinstance(sl, dict) else ""
+    return STATUS_FLAG in cmd and any(m in cmd.lower() for m in MARKERS)
+
+
+def statusline_installed():
+    try:
+        return statusline_ours(_read_settings().get("statusLine"))
+    except Exception:
+        return False
+
+
 def hook_command_prefix():
     """`<program>` as one shell string, for tools that take a command line (Antigravity)."""
     if WIN:
@@ -247,6 +269,11 @@ def set_hooks(on):
         data["hooks"] = hooks
     else:
         data.pop("hooks", None)
+    sl = data.get("statusLine")                # our status line too; someone else's is left alone
+    if on and (not isinstance(sl, dict) or not sl.get("command") or statusline_ours(sl)):
+        data["statusLine"] = statusline_entry()
+    elif not on and statusline_ours(sl):
+        data.pop("statusLine", None)
     try:
         import clawdy_agy                      # Antigravity CLI hooks come and go with these
         if clawdy_agy.installed():

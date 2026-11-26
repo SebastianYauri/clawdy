@@ -5,6 +5,15 @@ All notable changes to Clawdy are listed here. Versions follow
 
 ## 1.4.6
 
+- **Your sessions' context, model and cost.** Clawdy registers a Claude Code
+  status line next to its hooks (only if you don't have one): after every turn
+  it learns the session's model, how full its context window is and what it
+  has cost, and shows a short line in Claude Code's bar (`Clawdy · Opus 5.5 ·
+  ctx 16% · 5h 32% · 7d 37%`). The chats tree shows "ctx 16%" per open
+  session, and when one passes 85% Clawdy sweats and warns you that it will
+  compact soon. **Disconnect** removes it.
+- **What a session is waiting for.** "Permission: Bash git push…" or "asks you
+  something" instead of a bare "needs your permission".
 - **Smoother desktop walks.** Walking along the floor is a four-frame cycle now
   (contact, pass with a bob and the arms swinging, contact, pass with the other
   pair) instead of two feet alternating; hops have a crouch, the air and a

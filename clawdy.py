@@ -10,6 +10,7 @@
     clawdy.py --walk        send the running Clawdy for a walk right now
     clawdy.py --hook-agy    called by the Antigravity CLI on every event
     clawdy.py --statusline-agy   the Antigravity CLI's status line (its quota comes this way)
+    clawdy.py --statusline-claude  Claude Code's status line (model, context use, cost per session)
 """
 import os
 import sys
@@ -43,6 +44,18 @@ def main(argv):
     if "--hook" in argv:                 # hot path: fast and windowless
         import clawdy_hook
         clawdy_hook.main()
+        return 0
+    if "--statusline-claude" in argv:    # Claude Code status line: the session's model, context and cost on stdin
+        line = ""
+        try:
+            import json
+            import clawdy_hook
+            raw = read_stdin(1.5)
+            line = clawdy_hook.statusline(json.loads(raw) if raw.strip() else {})
+        except Exception:
+            pass
+        if sys.stdout:
+            sys.stdout.write((line or "Clawdy") + "\n")
         return 0
     if "--statusline-agy" in argv:       # Antigravity CLI status line: its state (quota included) on stdin
         line = ""

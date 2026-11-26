@@ -36,7 +36,8 @@ def open_sessions(now=None):
             continue
         out.append({"id": name[:-5], "cwd": s.get("cwd"), "project": _project(s.get("cwd")),
                     "state": s.get("state") or "idle", "ts": s.get("ts", 0), "pid": pid,
-                    "tty": s.get("tty"), "term": s.get("term"),
+                    "tty": s.get("tty"), "term": s.get("term"), "ask_text": s.get("ask_text"),
+                    "model": s.get("model"), "ctx": s.get("ctx"), "cost": s.get("cost"),
                     "started": s.get("started", 0), "done": s.get("done", 0),
                     "ask": s.get("ask", 0), "ask_kind": s.get("ask_kind")})
     urgent = {"notification": 0, "error": 1}

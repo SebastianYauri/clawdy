@@ -118,6 +118,14 @@ Prefer a regular installer? Grab it from the [latest release](https://github.com
 - **A Codex pet too.** Clawdy ships as a [Codex Pet](codex-pet/): **Settings… →
   Install as a Codex pet** and it shows up inside the Codex app and CLI with
   `/pet`, with every costume available as a separate pet.
+- **Each session's context, model and cost.** Clawdy also registers a Claude
+  Code **status line** (only if you don't have one; it leaves yours alone):
+  after every turn it learns the session's model, how full its context window
+  is and what it has cost, and prints a short line in Claude Code's bar
+  (`Clawdy · Opus 5.5 · ctx 16% · 5h 32% · 7d 37%`). The chats tree shows
+  `ctx 16%` per open session and what a waiting session wants ("permission:
+  Bash git push…"), and when a context passes 85% Clawdy sweats and warns you
+  it will compact soon. *Disconnect* removes it with the hooks.
 - **Gemini too, via Antigravity CLI.** Google replaced Gemini CLI with the
   Antigravity CLI (`agy`); Clawdy hooks into it (`~/.gemini/config/hooks.json`,
   installed with *React to Claude Code*) and acts out what it does, counts its
