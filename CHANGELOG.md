@@ -11,6 +11,9 @@ All notable changes to Clawdy are listed here. Versions follow
   Same size on screen; every costume lands on it pixel for pixel. A contact
   shadow sits under it (translucent on the desktop in pet mode) and lifts when
   it jumps.
+- **The same body on desktop walks.** Walks, hangs, climbs and hops are drawn
+  from the same half-pixel sprite as the widget, with outlined limbs and eye
+  glints, and costumes paint it cell by cell there too.
 - **Motion with weight.** Landings are a damped spring instead of a frozen
   squash, Clawdy leans into the direction it walks with a bounce in the body,
   whatever sits on its head lags behind sudden moves and catches up, blinks

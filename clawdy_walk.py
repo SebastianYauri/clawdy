@@ -209,51 +209,25 @@ def ghost(frame, boo=False, blink=False, look=0):
 
 
 def pose(kind, frame=0, look=0, blink=False, costume="none", col=None, wear=((), ())):
-    """Rectangles (x, y, w, h, color) in sprite pixels on the GW x GH grid.
-    `wear` is (behind, in front): the character's parts, from wear_from()."""
+    """Rectangles (x, y, w, h, color) in sprite pixels on the GW x GH grid (half-pixel
+    detail: coordinates may end in .5). `wear` is (behind, in front, paint): the character's
+    parts, from wear_from()."""
     if kind == "bat":
         return bat(frame, blink)
     if kind in ("ghost", "boo"):
         return ghost(frame, kind == "boo", blink, look)
     back, front = wear[0], wear[1]
     paint = wear[2] if len(wear) > 2 else None
-    return (list(back) + painted(plain(kind, frame, look, blink, col), paint, col) + list(front)
+    return (list(back) + plain(kind, frame, look, blink, col, paint) + list(front)
             + (broom() if kind == "broom" else []))
 
 
-def painted(rects, paint, col=None):
-    """Body, arm and leg rectangles take the costume's colours cell by cell (looked up at the
-    limb's rest position, so a raised arm keeps its sleeve)."""
-    if not paint:
-        return rects
-    body, body_d = (col or (ORANGE, ORANGE_D))[:2]
-    out = []
-    for x, y, w, h, c in rects:
-        if c == body_d and w == 1:                                                         # a leg
-            rest_y = lambda cy: min(max(cy, OY + 7), OY + 8)
-            rest_x = lambda cx: cx
-        elif c == body and (w, h) != (10, 7):                                              # an arm
-            left = x < OX + 6
-            rest_x = (lambda cx: min(max(cx, OX), OX + 1)) if left else (lambda cx: min(max(cx, OX + 12), OX + 13))
-            rest_y = lambda cy: min(max(cy, OY + 3), OY + 4)
-        elif c == body:                                                                    # the body
-            rest_x = lambda cx: cx
-            rest_y = lambda cy: cy
-        else:
-            out.append((x, y, w, h, c))
-            continue
-        for cy in range(y, y + h):
-            for cx in range(x, x + w):
-                out.append((cx, cy, 1, 1, paint.get((rest_x(cx), rest_y(cy)), c)))
-    return out
-
-
 def wear_from(widget):
-    """The character's parts as grid rectangles: every 2×2 block of a 32×32 part
-    image is one Clawdy pixel, so they land exactly on the walking sprite."""
+    """The character's parts as grid rectangles (half-pixel detail, like the body): the
+    pixels that fall on the body, arms or legs become `paint` and move with them."""
     import clawdy_character as character
     from clawdy_gui import BODY_CELLS
-    cells = {(r // 2, c // 2) for r, c in BODY_CELLS}      # the walk's grid is one Clawdy pixel per cell
+    cells = set(BODY_CELLS)
     ch = widget.character_now()
     skins = widget.skin_paths(ch)
     out, paint = [], {}
@@ -266,75 +240,131 @@ def wear_from(widget):
                 continue
             on_body = layer == "front" and path in skins
             for (sx, sy), colr in pix.items():
-                if sx % 2 or sy % 2:
-                    continue                           # one sample per Clawdy pixel
-                x, y = OX + (sx - 2) // 2, OY + (sy - 12) // 2
+                r, c = sy - 12, sx - 2                      # sprite cell
+                x, y = OX + c / 2, OY + r / 2
                 if not (0 <= x < GW and 0 <= y < GH):
                     continue
-                if on_body and (y - OY, x - OX) in cells:
-                    paint[(x, y)] = colr               # moves with the limb
+                if on_body and (r, c) in cells:
+                    paint[(r, c)] = colr                    # moves with the limb
                 else:
-                    rects.append((x, y, 1, 1, colr))
+                    rects.append((x, y, 0.5, 0.5, colr))
         out.append(rects)
     out.append(paint)
     return tuple(out)
+
+
+def _hex(c):
+    return "#%02x%02x%02x" % tuple(max(0, min(255, round(v * 255))) for v in c)
+
+
+def palette(col):
+    """Sprite colours (body, hi, sh, leg, out, eye, glint) from the (body, legs, eyes) hexes."""
+    body, _, eyes = col or (ORANGE, ORANGE_D, DARK)
+    rgb = tuple(int(body[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return {"body": body, "hi": _hex(tuple(min(1.0, v + (1 - v) * 0.28) for v in rgb)),
+            "sh": _hex(tuple(v * 0.80 for v in rgb)), "leg": _hex(tuple(v * 0.80 for v in rgb)),
+            "out": _hex(tuple(v * 0.34 for v in rgb)), "eye": eyes, "glint": "#ffffff"}
 
 
 def broom():
     return [(0, OY + 7, 11, 1, "#8a5a2b"), (11, OY + 6, 3, 3, "#d9b25a"), (14, OY + 6, 2, 3, "#b88a3a")]
 
 
-def plain(kind, frame=0, look=0, blink=False, col=None):
-    ORANGE, ORANGE_D, DARK = col or (globals()["ORANGE"], globals()["ORANGE_D"], globals()["DARK"])
-    R = [(OX + 2, OY, 10, 7, ORANGE)]                                   # body
+def limb(x, y, w, h, pal, paint, rest, fill="body"):
+    """An outlined limb covering (x, y, w, h) grid units, as half-pixel cells; painted
+    cells take the costume's colour looked up at the limb's rest cell."""
+    out = []
+    x2, y2, w2, h2 = round(x * 2), round(y * 2), round(w * 2), round(h * 2)
+    rx0, ry0, rx1, ry1 = rest
+    for j in range(h2):
+        for i in range(w2):
+            edge = i == 0 or i == w2 - 1 or j == 0 or j == h2 - 1
+            colr = pal["out"] if edge else pal[fill]
+            if paint:
+                rc = (min(max(ry0 + j, ry0), ry1), min(max(rx0 + i, rx0), rx1))
+                colr = paint.get(rc, colr)
+            out.append(((x2 + i) / 2, (y2 + j) / 2, 0.5, 0.5, colr))
+    return out
+
+
+def plain(kind, frame=0, look=0, blink=False, col=None, paint=None):
+    """Clawdy's body for a pose, from the same half-pixel sprite as the widget's."""
+    from clawdy_gui import SPRITE, BLOCKS, EYES
+    pal = palette(col)
+    R = []
+    if paint:                                     # cell by cell: the costume paints the body
+        for r, row in enumerate(SPRITE):
+            for c, ch in enumerate(row):
+                role = {"X": "body", "E": "body", "H": "hi", "S": "sh", "x": "out"}.get(ch)
+                if role:
+                    R.append((OX + c / 2, OY + r / 2, 0.5, 0.5, paint.get((r, c), pal[role])))
+    else:
+        for key, role, r0, c0, r1, c1 in BLOCKS:
+            if key == "body":
+                R.append((OX + c0 / 2, OY + r0 / 2, (c1 - c0 + 1) / 2, (r1 - r0 + 1) / 2, pal[role]))
+    # eyes: one Clawdy pixel wide, two tall, with a glint
     ey, eh = (OY + 3, 1) if blink else (OY + 2, 2)
-    eyes = [(OX + 4 + look, ey, 1, eh, DARK), (OX + 9 + look, ey, 1, eh, DARK)]
+    eyes = []
+    for r, c in EYES:
+        ex = OX + c / 2 + look
+        eyes.append((ex, ey, 1, eh, pal["eye"]))
+        if not blink:
+            eyes.append((ex + 0.25, ey + 0.25, 0.5, 0.5, pal["glint"]))
+    # limbs, in old grid units, with their rest cells for the paint
+    REST_L, REST_R = (0, 5, 3, 10), (24, 5, 27, 10)
+    LEG_REST = [(5, 14, 8, 17), (9, 14, 12, 17), (15, 14, 18, 17), (19, 14, 22, 17)]
     legs_x = [OX + 3, OX + 5, OX + 8, OX + 10]
-    legs = [(lx, OY + 7, 1, 2, ORANGE_D) for lx in legs_x]
-    arms = [(OX, OY + 3, 2, 2, ORANGE), (OX + 12, OY + 3, 2, 2, ORANGE)]
+    arm_l, arm_r = (OX, OY + 2.5, 2, 3), (OX + 12, OY + 2.5, 2, 3)
+    legs = [(lx - 0.5, OY + 7, 2, 2) for lx in legs_x]
     if kind in ("walk", "stomp"):
-        # a four-frame cycle: contact (all feet down, body low), pass (one pair up, body bobs
-        # up, arms swing), contact, pass with the other pair
         f = frame % 4
         passing = f % 2 == 1
         up = () if not passing else ((0, 2) if f == 1 else (1, 3))
-        legs = [(lx, OY + 6 if passing else OY + 7, 1, (1 if i in up else 3) if passing else 2, ORANGE_D)
+        legs = [(lx - 0.5, OY + 6 if passing else OY + 7, 2, (1 if i in up else 3) if passing else 2)
                 for i, lx in enumerate(legs_x)]
         if passing:
-            R = [(OX + 2, OY - 1, 10, 7, ORANGE)]
-            eyes = [(x, y - 1, w, h, c) for x, y, w, h, c in eyes]
+            R = [(x, y - 1, w, h, c_) for x, y, w, h, c_ in R]
+            eyes = [(x, y - 1, w, h, c_) for x, y, w, h, c_ in eyes]
         if kind == "walk":
             swing = (0 if not passing else (-1 if f == 1 else 1))
-            arms = [(OX, OY + 3 + swing - (1 if passing else 0), 2, 2, ORANGE),
-                    (OX + 12, OY + 3 - swing - (1 if passing else 0), 2, 2, ORANGE)]
+            arm_l = (OX, OY + 2.5 + swing - (1 if passing else 0), 2, 3)
+            arm_r = (OX + 12, OY + 2.5 - swing - (1 if passing else 0), 2, 3)
         else:                                    # Frankenstein: stiff legs, arms straight out front
-            arms = [(OX, OY + (0 if passing else 1), 2, 3, ORANGE), (OX + 12, OY + (0 if passing else 1), 2, 3, ORANGE)]
+            arm_l = (OX, OY + (0 if passing else 1), 2, 3.5)
+            arm_r = (OX + 12, OY + (0 if passing else 1), 2, 3.5)
     elif kind == "wave":
-        arms = [arms[0], (OX + 12, OY + (0 if frame % 2 else 1), 2, 2, ORANGE)]
+        arm_r = (OX + 12, OY + (0 if frame % 2 else 1), 2, 3)
     elif kind == "hang":                      # both hands on the edge above
         a = frame % 2
-        arms = [(OX, a, 2, OY + 5 - a, ORANGE), (OX + 12, 1 - a, 2, OY + 4 + a, ORANGE)]
+        arm_l = (OX, a, 2, OY + 5 - a)
+        arm_r = (OX + 12, 1 - a, 2, OY + 4 + a)
     elif kind == "hang1":                     # one hand on the edge, waving with the other
-        arms = [(OX, 0, 2, OY + 5, ORANGE), (OX + 12, OY + (0 if frame % 2 else 1), 2, 2, ORANGE)]
+        arm_l = (OX, 0, 2, OY + 5)
+        arm_r = (OX + 12, OY + (0 if frame % 2 else 1), 2, 3)
     elif kind == "broom":                     # riding: legs tucked, hands on the stick
-        legs = [(lx, OY + 7, 1, 1, ORANGE_D) for lx in legs_x]
-        arms = [(OX + 1, OY + 5, 2, 2, ORANGE), (OX + 11, OY + 5, 2, 2, ORANGE)]
+        legs = [(lx - 0.5, OY + 7, 2, 1) for lx in legs_x]
+        arm_l, arm_r = (OX + 1, OY + 5, 2, 2), (OX + 11, OY + 5, 2, 2)
     elif kind == "hop":                       # 0: crouch, 1: in the air (legs tucked), 2: landing squash
         if frame in (0, 2):
-            R = [(OX + 1, OY + 1, 12, 6, ORANGE)]
-            eyes = [(x, y + 1, w, h, c) for x, y, w, h, c in eyes]
-            arms = [(OX - 1, OY + 4, 2, 2, ORANGE), (OX + 13, OY + 4, 2, 2, ORANGE)]
-            legs = [(lx, OY + 7, 1, 2, ORANGE_D) for lx in legs_x]
+            R = [(x - 0.5 + (x - OX - 7) * 0.1, y + 1, w * 1.1, h * 0.86, c_) for x, y, w, h, c_ in R]
+            eyes = [(x, y + 1, w, h, c_) for x, y, w, h, c_ in eyes]
+            arm_l, arm_r = (OX - 1, OY + 3.5, 2, 3), (OX + 13, OY + 3.5, 2, 3)
+            legs = [(lx - 0.5, OY + 7, 2, 2) for lx in legs_x]
         else:
-            legs = [(lx, OY + 7, 1, 1, ORANGE_D) for lx in legs_x]
-            arms = [(OX, OY + 2, 2, 2, ORANGE), (OX + 12, OY + 2, 2, 2, ORANGE)]
+            legs = [(lx - 0.5, OY + 7, 2, 1) for lx in legs_x]
+            arm_l, arm_r = (OX, OY + 1.5, 2, 3), (OX + 12, OY + 1.5, 2, 3)
     elif kind in ("climb", "slide"):          # holding the rope in the middle
         a = frame % 2 if kind == "climb" else 0
-        arms = [(OX + 5, a, 1, OY - a, ORANGE), (OX + 8, 1 - a if kind == "climb" else 0,
-                                                   1, OY - (1 - a if kind == "climb" else 0), ORANGE)]
-        legs = [(OX + 5, OY + 7, 1, 2 - (frame % 2 if kind == "climb" else 0), ORANGE_D),
-                (OX + 8, OY + 7, 1, 1 + (frame % 2 if kind == "climb" else 1), ORANGE_D)]
-    return R + arms + legs + eyes
+        arm_l = (OX + 4.5, a, 1.5, OY - a)
+        arm_r = (OX + 7.5, 1 - a if kind == "climb" else 0, 1.5, OY - (1 - a if kind == "climb" else 0))
+        legs = [(OX + 4.5, OY + 7, 2, 2 - (frame % 2 if kind == "climb" else 0)),
+                (OX + 7.5, OY + 7, 2, 1 + (frame % 2 if kind == "climb" else 1))]
+    out = list(R)
+    out += limb(*arm_l, pal, paint, REST_L)
+    out += limb(*arm_r, pal, paint, REST_R)
+    for i, lg in enumerate(legs):
+        out += limb(*lg, pal, paint, LEG_REST[min(i, 3)], fill="leg")
+    return out + eyes
 
 
 # ---------------------------------------------------------------- the trip
@@ -459,12 +489,15 @@ class Walk:
             self._last_key = key
             c, p = self.canvas, self.p
             c.delete("all")
+            boxes = []
             for rx, ry, rw, rh, col in rects:
-                c.create_rectangle(rx * p, ry * p, (rx + rw) * p, (ry + rh) * p, fill=col, width=0)
+                x0, y0, x1, y1 = round(rx * p), round(ry * p), round((rx + rw) * p), round((ry + rh) * p)
+                if x1 > x0 and y1 > y0:
+                    c.create_rectangle(x0, y0, x1, y1, fill=col, width=0)
+                    boxes.append((x0, y0, x1 - x0, y1 - y0))
             if self.shaper:
                 try:
-                    self.shaper.set([(rx * p, ry * p, rw * p, rh * p) for rx, ry, rw, rh, _ in rects
-                                     if rw > 0 and rh > 0])
+                    self.shaper.set(boxes)
                 except Exception:
                     self.shaper = None
         self.win.geometry("+%d+%d" % (round(x), round(y)))
