@@ -114,10 +114,13 @@ class PetWindow:
             kind, pts, fill = op[0], op[1], op[2]
             if fill:
                 cr.set_source_rgb(*fill)
-            if kind == "rectangle":
-                x0, y0, x1, y1 = pts
-                cr.rectangle(x0, y0, x1 - x0, y1 - y0)
-                cr.fill()
+            if kind == "rectangle":                     # pixel-aligned and crisp: no seams between blocks
+                x0, y0, x1, y1 = (round(v) for v in pts)
+                if x1 > x0 and y1 > y0:
+                    cr.set_antialias(cairo.ANTIALIAS_NONE)
+                    cr.rectangle(x0, y0, x1 - x0, y1 - y0)
+                    cr.fill()
+                    cr.set_antialias(cairo.ANTIALIAS_DEFAULT)
             elif kind == "oval":
                 x0, y0, x1, y1 = pts
                 rx, ry = (x1 - x0) / 2, (y1 - y0) / 2
@@ -129,11 +132,19 @@ class PetWindow:
                     cr.restore()
                     cr.fill()
             elif kind == "polygon":
-                cr.move_to(pts[0], pts[1])
-                for i in range(2, len(pts), 2):
-                    cr.line_to(pts[i], pts[i + 1])
-                cr.close_path()
-                cr.fill()
+                axis = len(pts) == 8 and (pts[1] == pts[3] and pts[5] == pts[7] and pts[0] == pts[6] and pts[2] == pts[4])
+                if axis:                                  # an unrotated block: treat it as a rectangle
+                    cr.set_antialias(cairo.ANTIALIAS_NONE)
+                    x0, y0, x1, y1 = round(pts[0]), round(pts[1]), round(pts[2]), round(pts[5])
+                    cr.rectangle(min(x0, x1), min(y0, y1), abs(x1 - x0), abs(y1 - y0))
+                    cr.fill()
+                    cr.set_antialias(cairo.ANTIALIAS_DEFAULT)
+                else:
+                    cr.move_to(pts[0], pts[1])
+                    for i in range(2, len(pts), 2):
+                        cr.line_to(pts[i], pts[i + 1])
+                    cr.close_path()
+                    cr.fill()
             elif kind == "arc":                      # Tk angles: degrees counter-clockwise from 3 o'clock
                 x0, y0, x1, y1 = pts
                 start, extent, width = op[3], op[4], op[5]
