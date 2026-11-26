@@ -16,6 +16,7 @@ transparency on macOS, the X SHAPE extension on Linux) and the rope is a thin
 window of its own, so nothing ever has to be resized smoothly but the rope.
 """
 import math
+import os
 import random
 import re
 import subprocess
@@ -218,8 +219,72 @@ def pose(kind, frame=0, look=0, blink=False, costume="none", col=None, wear=((),
         return ghost(frame, kind == "boo", blink, look)
     back, front = wear[0], wear[1]
     paint = wear[2] if len(wear) > 2 else None
+    if kind == "side":
+        return profile(frame, look, blink, col, paint, back, front)
     return (list(back) + plain(kind, frame, look, blink, col, paint) + list(front)
             + (broom() if kind == "broom" else []))
+
+
+SIDE = 0.6                                           # a profile is this fraction of the front's width
+
+
+def profile(frame, d, blink, col, paint, back, front):
+    """Clawdy seen from the side, walking in direction d (-1 left, +1 right): the front sprite
+    (and whatever it wears) resampled to SIDE of its width about the body's centre, one eye on
+    the leading edge, a front and a back leg stepping, one arm swinging."""
+    from clawdy_gui import SPRITE
+    pal = palette(col)
+    cx = OX + 7                                      # the sprite's centre, in grid units
+    roles = {"X": "body", "E": "body", "H": "hi", "S": "sh", "x": "out"}
+
+    def cells_of(rects, cells):
+        for x, y, w, h, c_ in rects:                # overlays come as 0.5-cells
+            cells[(round((y - OY) * 2), round((x - OX) * 2))] = c_
+
+    def squeeze(cells):
+        """{(r, c): color} on the sprite's half-cell grid -> rects at SIDE width, nearest column."""
+        out = {}
+        for (r, c), c_ in cells.items():
+            j = round((c - 14) * SIDE)             # column relative to the centre (cell 14)
+            out[(r, j)] = c_
+        rects = []
+        for (r, j), c_ in out.items():
+            x = cx + j / 2
+            x = cx - (x - cx) - 0.5 if d > 0 else x   # mirror to face right
+            rects.append((x, OY + r / 2, 0.5, 0.5, c_))
+        return rects
+
+    body = {}
+    for r, row in enumerate(SPRITE):
+        for c, ch in enumerate(row):
+            role = roles.get(ch)
+            if role:
+                body[(r, c)] = paint.get((r, c), pal[role]) if paint else pal[role]
+    behind, ahead = {}, {}
+    cells_of(back, behind)
+    cells_of(front, ahead)
+    f = frame % 4
+    passing = f % 2 == 1
+    bob = -1 if passing else 0
+    out = squeeze(behind) + squeeze(body) + squeeze(ahead)
+    out = [(x, y + bob * 0.5, w, h, c_) for x, y, w, h, c_ in out]
+    # one eye, on the leading edge of the face
+    ex = cx - 2.0 if d < 0 else cx + 1.0
+    ey, eh = (OY + 3, 1) if blink else (OY + 2, 2)
+    out.append((ex, ey + bob * 0.5, 1, eh, pal["eye"]))
+    if not blink:
+        out.append((ex + 0.25, ey + 0.25 + bob * 0.5, 0.5, 0.5, pal["glint"]))
+    # legs: back leg and front leg, stepping past each other
+    stride = (0, 1.2, 0, -1.2)[f] * d              # the leading leg reaches out, the other trails
+    legs = [(cx - 2.25 + stride, OY + 7, 2, 2 if f in (0, 2) else (3 if f == 1 else 1)),
+            (cx + 0.25 - stride, OY + 7, 2, 2 if f in (0, 2) else (1 if f == 1 else 3))]
+    for i, (lx, ly, lw, lh) in enumerate(legs):
+        rest = (5, 14, 8, 17) if i == 0 else (15, 14, 18, 17)
+        out += limb(lx, ly + bob * 0.5, lw, lh, pal, paint, rest, fill="leg")   # the legs follow the bob
+    # the near arm, swinging opposite to the front leg
+    swing = (0, -1.0, 0, 1.0)[f] * d
+    out += limb(cx - 0.75 + swing, OY + 3 + (bob * 0.5), 1.5, 2.5, pal, paint, (0, 5, 3, 10))
+    return out
 
 
 def wear_from(widget):
@@ -413,7 +478,7 @@ class Walk:
         elif WIN:
             self.mon, self.floor = _monitor_windows(self.pcx, self.pcy)
             self.mode = "floor"
-        elif self.costume in FLOORED:            # on the floor everywhere: the bottom of the screen
+        elif self.costume in FLOORED or os.environ.get("CLAWDY_WALK") == "floor" or random.random() < 0.7:
             self.mon = (_monitor_mac if MAC else _monitor_linux)(self.pcx, self.pcy, sw, sh)[0]
             self.floor = self.mon[3] - (70 * k if MAC else 4 * k)     # above the Dock on macOS
             self.mode = "floor"
@@ -658,8 +723,8 @@ class Walk:
             self.draw("stand", x, stand - abs(math.sin(self.t * 4)) * 2 * k, lean=math.sin(self.t * 4) * 0.5)
         elif c == "gingerbread":                 # runs for it
             self.draw("walk", x, stand - abs(math.sin(self.t * 18)) * 3 * k, int(self.t * 16), lean=d * 0.6)
-        else:
-            self.draw("walk", x, stand, frame)
+        else:                                    # sideways, in profile, a bob on every step
+            self.draw("side", x, stand - (1.0 if frame % 2 else 0.0) * k, frame, look=d)
 
     def ceiling_step(self, name, q, frame):
         x0, ceil, D, k = self.x0, self.ceil, self.D, self.w.k

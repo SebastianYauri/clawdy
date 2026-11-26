@@ -11,6 +11,12 @@ All notable changes to Clawdy are listed here. Versions follow
   Same size on screen; every costume lands on it pixel for pixel. A contact
   shadow sits under it (translucent on the desktop in pet mode) and lifts when
   it jumps.
+- **Walks along the bottom of the screen, in profile.** Desktop walks now mostly
+  rappel down to the bottom edge, turn sideways and stroll along it (one eye on
+  the leading edge, a front and a back leg stepping, the near arm swinging, a
+  bob on every step), turn to face you to look around and wave, and stroll
+  back; the ceiling swing comes up now and then. The profile is the same
+  half-pixel body and costume, seen from the side.
 - **The same body on desktop walks.** Walks, hangs, climbs and hops are drawn
   from the same half-pixel sprite as the widget, with outlined limbs and eye
   glints, and costumes paint it cell by cell there too.
