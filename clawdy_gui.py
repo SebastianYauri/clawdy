@@ -3388,8 +3388,8 @@ class Widget:
 
         E = 2 * PX                                   # an eye: one old cell wide, two tall
         for r, c in EYES:
-            if paint and any((r + j, c + i) in paint for j in range(4) for i in range(2)):
-                continue                             # a mask covers this eye: it brings its own
+            if paint and any((r + j, c + i) in paint for j in range(2) for i in range(2)):
+                continue                             # a mask covers this eye (its upper half): it brings its own
             x, y = x0 + c * PX, y0 + r * PX
             ex = x + eye_dx
             if eye == "open":
