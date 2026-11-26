@@ -159,6 +159,7 @@ def _monitor_mac(x, y, sw, sh):
 
 FLIERS = ("vampire", "ghost", "witch", "pumpkin")   # these leave by air instead of the rope
 SLEIGH = ("santa", "reindeer")                      # these take the sleigh
+FLOORED = ("frank", "snowman", "tree", "gingerbread")   # these go along the bottom of the screen, each its way
 SLEIGH_FRAMES = 6
 SLEIGH_SEAT = (51, 14)                              # where Clawdy sits in a sleigh frame (image pixels)
 
@@ -323,7 +324,7 @@ class Walk:
         elif WIN:
             self.mon, self.floor = _monitor_windows(self.pcx, self.pcy)
             self.mode = "floor"
-        elif self.costume == "frank":            # stomps on the floor everywhere: the bottom of the screen
+        elif self.costume in FLOORED:            # on the floor everywhere: the bottom of the screen
             self.mon = (_monitor_mac if MAC else _monitor_linux)(self.pcx, self.pcy, sw, sh)[0]
             self.floor = self.mon[3] - (70 * k if MAC else 4 * k)     # above the Dock on macOS
             self.mode = "floor"
@@ -332,7 +333,7 @@ class Walk:
             self.mode = "ceiling"
         room = self.pcx - self.mon[0] - self.pw
         self.D = max(0.0, min(180 * k, room))
-        self.v = 70 * k
+        self.v = {"gingerbread": 170, "snowman": 45, "tree": 60}.get(self.costume, 70) * k
 
         x0 = self.pcx - self.pw / 2
         if self.mode == "sleigh":
@@ -528,13 +529,13 @@ class Walk:
             self.draw("stand", x0, stand)
         elif name == "walk":
             self.hide_rope()
-            self.draw("walk", x0 - D * q, stand, frame)
+            self.gait(x0 - D * q, stand, frame, -1)
         elif name == "look":
             self.draw("look", x0 - D, stand, look=-1 if q < 0.5 else 1)
         elif name == "wave":
             self.draw("wave", x0 - D, stand, frame)
         elif name == "back":
-            self.draw("walk", x0 - D * (1 - q), stand, frame)
+            self.gait(x0 - D * (1 - q), stand, frame, 1)
         elif name == "throw":
             self.rope_span(x0, lerp(stand, wb, ease(q)), stand + self.p)
             self.draw("slide", x0, stand)
@@ -542,6 +543,20 @@ class Walk:
             y = lerp(stand, wb, ease(q))
             self.rope_span(x0, wb, y + self.p)
             self.draw("climb", x0, y, frame)
+
+    def gait(self, x, stand, frame, d):
+        """Along the floor, each costume its own way."""
+        c, k = self.costume, self.w.k
+        if c == "tree":                          # hops as one piece
+            q = (self.t * 2.4) % 1
+            air = math.sin(q * math.pi)
+            self.draw("hop" if q < 0.85 else "stand", x, stand - air * 26 * k)
+        elif c == "snowman":                     # slides, rocking, no steps
+            self.draw("stand", x, stand - abs(math.sin(self.t * 4)) * 2 * k, lean=math.sin(self.t * 4) * 0.5)
+        elif c == "gingerbread":                 # runs for it
+            self.draw("walk", x, stand - abs(math.sin(self.t * 18)) * 3 * k, int(self.t * 12), lean=d * 0.6)
+        else:
+            self.draw("walk", x, stand, frame)
 
     def ceiling_step(self, name, q, frame):
         x0, ceil, D, k = self.x0, self.ceil, self.D, self.w.k

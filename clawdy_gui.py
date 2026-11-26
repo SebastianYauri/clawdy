@@ -179,7 +179,8 @@ SPOOKY = ("witch", "pumpkin", "ghost", "vampire", "frank")
 # In costume the special move shows up more often, plus its own "trick"
 COSTUME_ACTS = ["walk", "special", "jump", "look", "trick", "special", "spin", "trick", "stretch", "flip"]
 TRICKS = {"witch": "fly", "vampire": "bat", "ghost": "float", "pumpkin": "roll", "santa": "present",
-          "frank": "zombie"}
+          "frank": "zombie", "reindeer": "prance", "elf": "wrap", "snowman": "melt",
+          "gingerbread": "catchme", "tree": "lightshow"}
 # Claude Code work props, in costume
 THEMED = {("witch", "bubble"): "crystal", ("witch", "laptop"): "spellbook", ("witch", "book"): "spellbook",
           ("witch", "hammer"): "cauldron", ("santa", "laptop"): "gift"}
@@ -190,7 +191,16 @@ PALETTES = {
     "vampire": [(0.88, 0.14, 0.20), (0.62, 0.55, 0.72), (0.95, 0.95, 0.95)],
     "santa": [(0.90, 0.16, 0.16), (0.22, 0.72, 0.32), (1.0, 1.0, 1.0), (1.0, 0.85, 0.35)],
     "frank": [(0.55, 0.85, 0.40), (0.70, 0.90, 1.0), (1.0, 0.95, 0.45)],
+    "reindeer": [(0.55, 0.35, 0.17), (1.0, 0.25, 0.25), (1.0, 0.85, 0.35), (1.0, 1.0, 1.0)],
+    "elf": [(0.18, 0.62, 0.31), (0.83, 0.16, 0.16), (1.0, 0.85, 0.35)],
+    "snowman": [(0.96, 0.97, 1.0), (0.55, 0.80, 1.0), (1.0, 0.55, 0.16)],
+    "gingerbread": [(0.75, 0.50, 0.25), (1.0, 1.0, 1.0), (1.0, 0.35, 0.55), (0.35, 0.80, 1.0)],
+    "tree": [(0.18, 0.62, 0.31), (1.0, 0.29, 0.29), (1.0, 0.85, 0.35), (0.35, 0.80, 1.0)],
 }
+# how each costume walks: (speed, step rate) in the porthole; the branch in draw_clawd shapes the rest
+GAITS = {"reindeer": (60, 9), "elf": (70, 16), "snowman": (35, 4), "gingerbread": (40, 6), "tree": (38, 5),
+         "santa": (42, 8)}
+BAUBLES = [(1.0, 0.29, 0.29), (0.35, 0.80, 1.0), (1.0, 0.85, 0.35), (0.95, 0.45, 0.85)]
 MAGIC = [(0.75, 0.45, 0.95), (1.0, 0.85, 0.35), (0.55, 0.85, 1.0)]
 
 
@@ -2243,16 +2253,66 @@ class Widget:
             dy = -6 - math.sin(t * 2.5) * 3
             arm_l = arm_r = math.sin(t * 3) * 2
         elif act in ("walk", "run"):
-            v = (55 if act == "walk" else 140) * energy
-            f = (10 if act == "walk" else 18) * energy
+            gait = costume if act == "walk" and costume in GAITS else None
+            v, f = GAITS.get(gait, (55, 10)) if act == "walk" else (140, 18)
+            v, f = v * energy, f * energy
             self.pos += self.dir * v * dt
+            turned = False
             if abs(self.pos) > lim:
                 self.pos = math.copysign(lim, self.pos)
                 self.dir *= -1
+                turned = True
             dy = -abs(math.sin(t * f)) * 3
             step = int(t * f / math.pi * 2) % 2
             sw = math.sin(t * f) * 3
             arm_l, arm_r = sw, -sw
+            if gait == "reindeer":               # a two-beat trot, antlers swaying
+                beat = math.sin(t * f * 0.7)
+                dy = -abs(beat) * 6
+                rot = self.dir * beat * 0.06
+                arm_l, arm_r = -2 + beat * 2, -2 - beat * 2
+                self.part_fx["head"] = (-self.dir * beat * 1.2, abs(beat) * 0.6, -self.dir * beat * 0.05)
+            elif gait == "elf":                  # tiptoe skips, the bell rings on each one
+                dy = -abs(math.sin(t * f)) * 5
+                sy = 1 + 0.04 * math.sin(t * f * 2)
+                eye = "happy"
+                self.part_fx["head"] = (math.sin(t * f * 2) * 0.7, 0, math.sin(t * f * 2) * 0.04)
+                if self.emit <= 0 and random.random() < 0.35:
+                    self.spawn("jingle", cx + self.pos - self.dir * 10, by - SH - 8, -self.dir * 12, -22, 0.9)
+                    self.emit = 0.6
+            elif gait == "snowman":              # slides along, rocking, no steps: it has no legs to speak of
+                step = None
+                rot = math.sin(t * 4) * 0.1
+                dy = -abs(math.sin(t * 4)) * 1
+                arm_l = arm_r = math.sin(t * 4) * 2
+                if self.emit <= 0:
+                    self.spawn("snow", cx + self.pos - self.dir * SW / 2, by - 2, -self.dir * 20, -8, 0.6,
+                               ph=random.uniform(0, 6))
+                    self.emit = 0.12
+            elif gait == "gingerbread":          # a stiff cookie waddle, crumbs on the turns
+                k2 = int(t * 6) % 2
+                step = k2
+                rot = 0.1 if k2 else -0.1
+                dy = -1.5 * k2
+                arm_l = arm_r = -6
+                eye = "happy"
+                if turned:
+                    for _ in range(3):
+                        self.spawn("crumb", cx + self.pos, by - 3, random.uniform(-25, 25), random.uniform(-25, -5), 0.7)
+            elif gait == "tree":                 # hops along as one piece, baubles jiggling
+                q = (t * 2.4) % 1
+                air = math.sin(q * math.pi)
+                dy = -air * 14 * HOP
+                step = None
+                tuck = q < 0.85
+                sy = 1 + 0.06 * air if q < 0.85 else 0.9
+                sx = 1 - 0.04 * air if q < 0.85 else 1.1
+                self.part_fx["body"] = (math.sin(t * 16) * (0.8 if q > 0.85 else 0.2), 0, 0)
+            elif gait == "santa":                # a jolly stroll, belly bouncing
+                sy = 1 + 0.05 * abs(math.sin(t * f))
+                sx = 1 - 0.03 * abs(math.sin(t * f))
+                eye = "happy"
+                arm_l, arm_r = -2 + sw * 0.6, -2 - sw * 0.6
             if act == "run":
                 arm_l, arm_r = -6 + sw, -6 - sw
                 eye = "scared"
@@ -2368,12 +2428,166 @@ class Widget:
                 if q < 0.06 and self.emit <= 0:
                     self.spawn("jo", cx + self.pos, by - SH - 16, 0, -16, 1.2)
                     self.emit = 0.4
+            elif c == "reindeer":               # the nose lights the way
+                q = (p * 2) % 1
+                lit = q < 0.6
+                eye = "happy" if lit else "open"
+                dy = -abs(math.sin(t * 5)) * 2 if lit else 0
+                arm_l = arm_r = -4 if lit else 0
+                if lit and self.emit <= 0:
+                    self.spawn("glow", cx + self.pos, by - SH * 0.42, 0, 0, 0.35, r=14 + 6 * math.sin(t * 9))
+                    self.spawn("star", cx + self.pos + random.uniform(-10, 10), by - SH * 0.42 + random.uniform(-6, 6),
+                               random.uniform(-25, 25), random.uniform(-40, -5), 0.6, col=(1.0, 0.35, 0.35))
+                    self.emit = 0.09
+            elif c == "elf":                    # a little jingle hop, the bell rings
+                q = (p * 4) % 1
+                dy = -math.sin(q * math.pi) * 10 * HOP
+                eye = "happy"
+                self.part_fx["head"] = (math.sin(t * 22) * 0.9, 0, math.sin(t * 22) * 0.05)
+                if q < 0.1 and self.emit <= 0:
+                    self.spawn("jingle", cx + self.pos + 14, by - SH - 14, 10, -26, 1.1)
+                    self.emit = 0.3
+            elif c == "snowman":                # shivers in the cold
+                self.pos += math.sin(t * 50) * 0.8
+                eye = "scared" if (t % 1.2) < 0.6 else "closed"
+                sy = 0.97
+                if self.emit <= 0:
+                    self.spawn("snow", cx + self.pos + random.uniform(-30, 30), by - SH - 20, 0, 20, 2.0,
+                               ph=random.uniform(0, 6))
+                    if random.random() < 0.3:
+                        self.spawn("puff", cx + self.pos + self.dir * 8, by - SH * 0.45, self.dir * 12, -10, 0.7)
+                    self.emit = 0.18
+            elif c == "gingerbread":            # crumbles a little and shrugs
+                q = (p * 2) % 1
+                if q < 0.4:
+                    self.pos += math.sin(t * 40) * 0.6
+                    eye = "scared"
+                    if self.emit <= 0:
+                        self.spawn("crumb", cx + self.pos + random.uniform(-SW / 2, SW / 2), by - 4,
+                                   random.uniform(-20, 20), random.uniform(-10, 10), 0.8)
+                        self.emit = 0.07
+                else:
+                    arm_l = arm_r = -8
+                    eye = "happy"
+            elif c == "tree":                   # shake: baubles come loose
+                q = (p * 2) % 1
+                rot = math.sin(t * 24) * 0.06 if q < 0.45 else 0
+                eye = "scared" if q < 0.45 else "happy"
+                self.part_fx["body"] = (math.sin(t * 24) * 1.2 if q < 0.45 else 0, 0, 0)
+                if q < 0.45 and self.emit <= 0:
+                    self.spawn("bauble", cx + self.pos + random.uniform(-SW / 2, SW / 2), by - SH * random.uniform(0.3, 0.9),
+                               random.uniform(-30, 30), random.uniform(-40, 0), 1.0, col=random.choice(BAUBLES))
+                    self.emit = 0.12
             else:                               # no costume: wave
                 arm_r = -9 + math.sin(t * 16) * 4
                 eye = "happy"
                 if self.emit <= 0:
                     self.spawn("heart", cx + self.pos + SW / 2, by - SH, 15, -30, 1.4)
                     self.emit = 0.7
+
+        elif act == "prance":                    # reindeer: a canter with bells, nose aglow
+            beat = (t * 2.2) % 1                 # two quick hops and a breath
+            hop = math.sin(beat * 2 * math.pi) if beat < 0.5 else 0
+            self.pos += self.dir * 34 * dt
+            if abs(self.pos) > lim:
+                self.pos = math.copysign(lim, self.pos)
+                self.dir *= -1
+            dy = -abs(hop) * 12 * HOP
+            rot = self.dir * hop * 0.12
+            step = int(t * 7) % 2
+            arm_l, arm_r = -3 - hop * 3, -3 + hop * 3
+            eye = "happy"
+            self.part_fx["head"] = (-self.dir * hop * 1.5, hop * 0.8, -self.dir * hop * 0.08)   # antlers sway
+            if self.emit <= 0:
+                self.spawn("glow", cx + self.pos + self.dir * 2, by - SH * 0.42, 0, 0, 0.3,
+                           r=10 + 3 * math.sin(t * 8))
+                if beat < 0.06 or 0.25 < beat < 0.31:
+                    self.spawn("jingle", cx + self.pos - self.dir * 12, by - SH * 0.6,
+                               -self.dir * 18, -24, 1.0)
+                self.emit = 0.08
+        elif act == "wrap":                      # elf: wraps a present in a whirl of ribbon
+            q = p
+            if q < 0.7:
+                arm_l = -6 + math.sin(t * 18) * 4
+                arm_r = -6 - math.sin(t * 18) * 4
+                dy = -abs(math.sin(t * 9)) * 2
+                eye = "open"
+                eye_dx = math.sin(t * 9) * 2
+                if self.emit <= 0:
+                    a = t * 9
+                    self.spawn("conf", cx + self.pos + math.cos(a) * 16, by - SH / 2 + math.sin(a) * 10,
+                               math.cos(a) * 30, -20 + math.sin(a) * 20, 0.8,
+                               col=random.choice(((0.83, 0.16, 0.16), (0.18, 0.62, 0.31), (1.0, 0.85, 0.35))),
+                               spin=random.uniform(0, 6))
+                    self.emit = 0.05
+            else:                                # ta-da: the gift, held high
+                props.append("gift")
+                arm_l = arm_r = -9
+                eye = "happy"
+                dy = -abs(math.sin(t * 6)) * 3
+                if q < 0.74 and self.emit <= 0:
+                    for _ in range(6):
+                        self.spawn("star", cx + self.pos, by - SH - 10, random.uniform(-50, 50),
+                                   random.uniform(-70, -20), 0.9, col=random.choice(PALETTES["elf"]))
+                    self.emit = 0.5
+        elif act == "melt":                      # snowman: melts into a puddle and pops back
+            q = p
+            if q < 0.45:                         # going down
+                m = ease(q / 0.45)
+                sy, sx = 1 - 0.65 * m, 1 + 0.5 * m
+                eye = "scared"
+                dy = 0
+                if self.emit <= 0:
+                    self.spawn("drop", cx + self.pos + random.uniform(-SW / 2, SW / 2), by - 2, random.uniform(-20, 20), -10, 0.6)
+                    self.emit = 0.12
+            elif q < 0.7:                        # a puddle with eyes
+                sy, sx = 0.35, 1.5
+                eye = "x" if (t % 1.0) < 0.5 else "scared"
+            else:                                # pop! back in shape, a flurry of snow
+                m = ease((q - 0.7) / 0.3)
+                sy = 0.35 + (1.12 - 0.35) * m if m < 0.8 else 1.12 - 0.12 * (m - 0.8) / 0.2
+                sx = 1.5 - 0.5 * m
+                eye = "happy"
+                if q < 0.74 and self.emit <= 0:
+                    for i in range(12):
+                        a = i * math.pi / 6
+                        self.spawn("snow", cx + self.pos + math.cos(a) * 8, by - SH / 2 + math.sin(a) * 6,
+                                   math.cos(a) * 60, math.sin(a) * 40 - 20, 1.0, ph=random.uniform(0, 6))
+                    self.emit = 0.4
+        elif act == "catchme":                   # gingerbread: run, run, as fast as you can
+            v = 150
+            self.pos += self.dir * v * dt
+            if abs(self.pos) > lim:
+                self.pos = math.copysign(lim, self.pos)
+                self.dir *= -1
+                for _ in range(5):               # skids at the turn
+                    self.spawn("crumb", cx + self.pos, by - 3, -self.dir * random.uniform(20, 60),
+                               random.uniform(-30, -5), 0.7)
+            f = 18
+            dy = -abs(math.sin(t * f)) * 3
+            step = int(t * f / math.pi * 2) % 2
+            rot = self.dir * 0.14
+            arm_l, arm_r = -6 + math.sin(t * f) * 3, -6 - math.sin(t * f) * 3
+            eye = "happy"
+            eye_dx = self.dir * 2.5
+            if self.emit <= 0:
+                self.spawn("dust", cx + self.pos - self.dir * SW / 2, by, -self.dir * 30, -6, 0.4)
+                self.emit = 0.07
+        elif act == "lightshow":                 # tree: the lights chase, the star shines
+            rot = math.sin(t * 2.2) * 0.05
+            self.part_fx["body"] = (math.sin(t * 2.2) * 0.6, 0, 0)
+            eye = "happy"
+            dy = -abs(math.sin(t * 2.2)) * 1.5
+            if self.emit <= 0:
+                i = int(t * 10)
+                a = i * 2.4                      # a spiral of lights up the tree
+                h = (i % 8) / 8
+                self.spawn("star", cx + self.pos + math.cos(a) * (SW / 2 + 2) * (1 - 0.6 * h),
+                           by - SH * (0.15 + 0.8 * h), 0, -4, 0.5, col=BAUBLES[i % len(BAUBLES)])
+                if i % 8 == 7:
+                    self.spawn("spark", cx + self.pos + random.uniform(-6, 6), by - SH - 14 + random.uniform(-4, 4),
+                               random.uniform(-30, 30), random.uniform(-40, -10), 0.6)
+                self.emit = 0.1
 
         elif act == "fly":                       # witch: a figure-eight swoop on the broom
             ang = p * 2 * math.pi
@@ -2669,6 +2883,12 @@ class Widget:
                 if costume == "santa":
                     self.spawn("snow", cx + random.uniform(-60, 60), 20, 0, 25, 3.0, ph=random.uniform(0, 6))
                 self.emit = 0.15
+
+        if costume == "elf" and act in ("jump", "flip", "dance", "wave"):   # the bell on the hat swings
+            self.part_fx["head"] = (math.sin(t * 20) * 0.8, 0, math.sin(t * 20) * 0.05)
+        if costume in character.XMAS and act in ("look", "sleep", "stretch") and self.emit <= 0 and random.random() < 0.4:
+            self.spawn("puff", cx + self.pos + self.dir * 8, by - SH * 0.45, self.dir * 14, -8, 0.8)   # cold breath
+            self.emit = 1.6
 
         if eye == "open" and (t % 3.1) < 0.13:
             eye = "closed"
@@ -3138,7 +3358,7 @@ class Widget:
             alive.append(q)
             q["x"] += q["vx"] * dt
             q["y"] += q["vy"] * dt
-            if q["k"] in ("spark", "drop", "conf", "fw"):
+            if q["k"] in ("spark", "drop", "conf", "fw", "bauble", "crumb"):
                 q["vy"] += 120 * dt
             a = q["life"] / q["max"]
             if self.pet and a < 0.4:          # no card behind: a faded particle would be a dark speck
@@ -3171,6 +3391,20 @@ class Widget:
                 self.rect(x + 0.5, y - 1.5, 1.5, 1.5, eye)
             elif k == "bubble":
                 self.oval(x, y, 3, 3, hx((0.45, 0.90, 0.40), a))
+            elif k == "glow":                               # a soft red halo (Rudolph)
+                r = q["r"] * (0.6 + 0.4 * a)
+                self.oval(x, y, r, r * 0.8, hx((1.0, 0.55, 0.50), a * 0.16))
+                self.oval(x, y, r * 0.55, r * 0.45, hx((1.0, 0.72, 0.65), a * 0.26))
+            elif k == "bauble":
+                self.oval(x, y, 4, 4, hx(q["col"], a))
+                self.oval(x - 1.3, y - 1.3, 1.3, 1.3, hx((1, 1, 1), a * 0.9))
+            elif k == "crumb":
+                self.rect(x - 1.5, y - 1.5, 3, 3, hx((0.62, 0.40, 0.18), a))
+            elif k == "jingle":
+                tx = x + math.sin(t * 5 + y) * 3
+                for ox, oy in ((-1.5, 0), (1.5, 0), (0, -1.5), (0, 1.5)):
+                    self.text(tx + ox, y + oy, "♪", hx((0.30, 0.20, 0.05), a), 14, bold=True, anchor="center")
+                self.text(tx, y, "♪", hx((1.0, 0.85, 0.35), a), 14, bold=True, anchor="center")
             elif k == "fw":
                 self.rect(x - 2.5, y - 2.5, 5, 5, hx(q["col"], a))
                 self.rect(x - q["vx"] * 0.05 - 1.5, y - q["vy"] * 0.05 - 1.5, 3, 3, hx(q["col"], a * 0.5))

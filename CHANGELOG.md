@@ -3,6 +3,22 @@
 All notable changes to Clawdy are listed here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## 1.4.6
+
+- **Every Christmas outfit moves its own way.** Walks: the reindeer trots on two
+  beats with its antlers swaying, the elf skips on tiptoe with the bell on its
+  hat ringing, the snowman slides and rocks without a step and leaves snow, the
+  gingerbread waddles stiff as a cookie and drops crumbs on the turns, the tree
+  hops along in one piece with its baubles jiggling, Santa strolls with a belly
+  bounce. Tricks: the reindeer prances with jingle bells and a glowing nose, the
+  elf wraps a present in a whirl of ribbon and holds it up, the snowman melts
+  into a puddle (eyes and all) and pops back in a flurry, the gingerbread runs
+  "as fast as it can", the tree puts on a light show. Specials: Rudolph lights
+  the way, the elf's jingle hop, the snowman shivers, the gingerbread crumbles
+  and shrugs, the tree shakes its baubles loose. They all breathe little clouds
+  in the cold. On desktop walks the tree hops along the bottom of the screen,
+  the snowman slides and the gingerbread runs.
+
 ## 1.4.5
 
 - **Fix: Clawdy stayed a dark, empty card after install.** When the first
