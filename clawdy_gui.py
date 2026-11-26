@@ -3160,6 +3160,8 @@ class Widget:
         for path in character.layers(ch, layer):
             slot = os.path.basename(os.path.dirname(path))
             fx = self.part_fx.get(slot) if ch is self.character_now() else None
+            if layer == "front" and path in self.skin_paths(ch):
+                fx = None                            # painted onto the body: it moves with the body, whole
             pxf = xf
             if fx:                                   # e.g. a hat trailing in the wind
                 tx, ty = xf.pt(fx[0], fx[1])
